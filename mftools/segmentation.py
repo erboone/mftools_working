@@ -85,6 +85,7 @@ class CellSegmentation:
         imagedata: fileio.ImageDataset = None,
         channel: str = "PolyT",
         zslice: int = None,
+        model_path:Path=None
     ) -> None:
         """Initialize the instance.
 
@@ -104,7 +105,10 @@ class CellSegmentation:
         self.channel = channel
         self.zslice = zslice
         if imagedata is not None:
-            self.model = cpmodels.Cellpose(gpu=True, model_type="cyto2")
+            if model_path is not None:
+                self.model = cpmodels.CellposeModel(gpu=True, pretrained_model=model_path)
+            else:
+                self.model = cpmodels.Cellpose(gpu=True, model_type="cyto2")
             if not self.positions and imagedata.has_positions():
                 self.positions = images.FOVPositions(positions=imagedata.load_fov_positions())
         self.masks = {}
