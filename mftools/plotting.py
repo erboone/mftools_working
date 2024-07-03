@@ -415,3 +415,32 @@ def create_color_image(
     img = np.array([red, green, blue])
     img = np.moveaxis(img, 0, -1)
     return img
+
+def plot_fov(
+        seg,
+        fov:int, 
+        show:bool=True, 
+        plot_mask:bool=True, 
+        plot_centroids:bool=True, 
+        plot_channel:bool=True,
+        channel:str='DAPI'
+    ) -> None | Axes: 
+    
+    mask = seg[fov]
+    centroids = np.array([cell.centroid for cell in regionprops(mask)])
+    channel = imageset.load_image(channel=channel, fov=fov, max_projection=True)
+
+    fig, ax = plt.subplots(1, 1)
+    plt.figure(dpi=150)
+    if plot_channel: 
+        plt.imshow(channel, cmap="gray")
+    if plot_mask: 
+        plt.contour(mask, [x+0.5 for x in np.unique(mask)], colors="tab:blue")
+    if plot_centroids: 
+        plt.scatter(centroids[:,1], centroids[:,0], c="tab:blue", s=2)
+    plt.axis("off")
+
+    if show:
+        fig.show()
+    else:
+        return ax
