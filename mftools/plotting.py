@@ -5,7 +5,10 @@ import pandas as pd
 import scanpy as sc
 from scipy.stats import zscore, pearsonr
 from matplotlib.ticker import FuncFormatter
+from matplotlib.axes import Axes
 from skimage import transform
+from skimage.measure import regionprops
+
 
 from . import config
 from . import stats
@@ -418,6 +421,7 @@ def create_color_image(
 
 def plot_fov(
         seg,
+        imset,
         fov:int, 
         show:bool=True, 
         plot_mask:bool=True, 
@@ -428,7 +432,7 @@ def plot_fov(
     
     mask = seg[fov]
     centroids = np.array([cell.centroid for cell in regionprops(mask)])
-    channel = imageset.load_image(channel=channel, fov=fov, max_projection=True)
+    channel = imset.load_image(channel=seg.channel, fov=fov, max_projection=True)
 
     fig, ax = plt.subplots(1, 1)
     plt.figure(dpi=150)
