@@ -419,32 +419,50 @@ def create_color_image(
     img = np.moveaxis(img, 0, -1)
     return img
 
-def plot_fov(
-        seg,
-        imset,
-        fov:int, 
+def fov_show(
+        seg=None, # passing in all these objects feels a little silly
+        imset=None, # But also, in general, I'm not happy with this implementation.
+        output=None, # 
+        fov:int=-1, 
+        channel:str='DAPI',
         show:bool=True, 
         plot_mask:bool=True, 
-        plot_centroids:bool=True, 
         plot_channel:bool=True,
-        channel:str='DAPI'
+        plot_centroids:bool=False,
+        plot_transcripts:bool=False
     ) -> None | Axes: 
     
-    mask = seg[fov]
-    centroids = np.array([cell.centroid for cell in regionprops(mask)])
-    channel = imset.load_image(channel=seg.channel, fov=fov, max_projection=True)
-
+    # Init figure
     fig, ax = plt.subplots(1, 1)
     plt.figure(dpi=150)
-    if plot_channel: 
+
+    mask = seg[fov]
+
+    if plot_channel:
+        channel = imset.load_image(channel=seg.channel, fov=fov, max_projection=True)
         plt.imshow(channel, cmap="gray")
+    
     if plot_mask: 
         plt.contour(mask, [x+0.5 for x in np.unique(mask)], colors="tab:blue")
-    if plot_centroids: 
+
+    if plot_centroids:
+        centroids = np.array([cell.centroid for cell in regionprops(mask)])
         plt.scatter(centroids[:,1], centroids[:,0], c="tab:blue", s=2)
+
+    if plot_transcripts:
+        barcodes = output.load_barcode_table()
+        incells = barcodes[(barcodes['fov'] == TEST_FOV) & (barcodes['cell_id'] != 0)]
+        plt.scatter(incells['x'], incells['y'], s=.3)
+        outcells = barcodes[(barcodes['fov'] == TEST_FOV) & (barcodes['cell_id'] == 0)]
+        plt.scatter(outcells['x'], outcells['y'], s=.3)
+
     plt.axis("off")
 
     if show:
         fig.show()
     else:
         return ax
+    
+def fov_transcripts():
+    pass
+    # do this
