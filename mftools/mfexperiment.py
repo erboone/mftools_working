@@ -30,9 +30,31 @@ class _AbsMFExperiment(ABC):
         self.imgset = ImageDataset(image_dataset_path)
         self.seg = CellSegmentation(imagedata=self.imgset, channel='dapi', zslice=3)
 
+    @property
+    def seg(self):
+        """Getter for the CellSegmentation object for this MerfishExperiment.
+        If object is not initialized, resolve relevant paths, initialize, and
+        return, otherwise, just return.
+        """
+
+    @property.setter
     def cellsegmentation(self):
-        meta_dat = self.seg.metadata
-        self.output.save_cell_metadata()
+        # TODO: decide if this is needed
+        """Setter for the cell segmentation object for this MerfishExperiment.
+        """
+
+    @property
+    def imgs(self):
+        """Getter for the ImageDataset object for this MerfishExperiment.
+        If object is not initialized, resolve relevant paths, initialize, and
+        return, otherwise, just return.
+        """
+    @property
+    def imgs(self):
+        """Getter for the ImageDataset object for this MerfishExperiment.
+        If object is not initialized, resolve relevant paths, initialize, and
+        return, otherwise, just return.
+        """
         
 
 
