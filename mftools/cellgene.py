@@ -62,6 +62,8 @@ def create_scanpy_object(analysis, name=None, positions=None, codebook=None, kee
         adata.uns["dataset_name"] = analysis.root.name
     return adata
 
+def load_scanpy_object() -> None:
+    pass
 
 def adjust_spatial_coordinates(adata, flip_horizontal=False, flip_vertical=False, transpose=False):
     if transpose and (flip_horizontal or flip_vertical):

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-
 import os, sys
 from configparser import ConfigParser
 from pathlib import Path
@@ -16,16 +15,15 @@ from mftools.fileio import ImageDataset, MerfishAnalysis
 from mftools.plotting import fov_show
 from mftools.segmentation import CellSegmentation
 from mftools.barcodes import assign_to_cells, link_cell_ids, create_cell_by_gene_table
-
+from mftools.cellgene import create_scanpy_object
 
 # ----- Load Config ----- #
 # TODO: change this to work with config files generated from merbot
 config:ConfigParser = ConfigParser()
 config.read('config.ini')
 ioconf = config["IO Options"]
-csconf = config["Cellpose"] # TODO: rename to 1_Cell_Segmentation
+csconf = config["2 Label Transfer"] # TODO:
 
-# Filepath naming (Ren9)
 MERSCOPE_DIR = ioconf['msdir']
 EXPERIMENT_NAME = ioconf['experiment']
 
@@ -91,3 +89,4 @@ barcodes = output.load_barcode_table()
 cbgtab = create_cell_by_gene_table(barcodes)
 cbgtab.index = cbgtab.index.astype(int)
 output.save_cell_by_gene_table(cbgtab)
+# TODO: Create and write the scanpy object somewhere.

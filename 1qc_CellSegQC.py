@@ -49,7 +49,6 @@ fig_outpath = f"./fig_dump_{EXPERIMENT_NAME}"
 print(f"Looking for images in {image_dataset_path}")
 print(f"Looking for positions in {positions_path}")
 
-
 output = MerfishAnalysis(cellpose_path)
 imageset = ImageDataset(image_dataset_path)
 seg = CellSegmentation(imagedata=imageset, output=output, channel=CHANNEL, zslice=3)
