@@ -238,6 +238,10 @@ def fov_error_spatial(per_fov_error, positions) -> None:
     fig.tight_layout()
     fig.savefig(config.path("fov_error_spatial.png"), dpi=300)
 
+def plot_correlation() -> None:
+    # TODO: add a plot correlation function: see below for implementation detail.
+    # Make data agnostic
+    pass
 
 def rnaseq_correlation(bcs, dataset) -> None:
     refcounts = util.reference_gene_counts(dataset["file"])
@@ -451,9 +455,9 @@ def fov_show(
 
     if plot_transcripts:
         barcodes = output.load_barcode_table()
-        incells = barcodes[(barcodes['fov'] == TEST_FOV) & (barcodes['cell_id'] != 0)]
+        incells = barcodes[(barcodes['fov'] == fov) & (barcodes['cell_id'] != 0)]
         plt.scatter(incells['x'], incells['y'], s=.3)
-        outcells = barcodes[(barcodes['fov'] == TEST_FOV) & (barcodes['cell_id'] == 0)]
+        outcells = barcodes[(barcodes['fov'] == fov) & (barcodes['cell_id'] == 0)]
         plt.scatter(outcells['x'], outcells['y'], s=.3)
 
     plt.axis("off")
