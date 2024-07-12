@@ -38,7 +38,7 @@ class _AbsMFExperiment(ABC):
         """
 
     @property.setter
-    def cellsegmentation(self):
+    def seg(self):
         # TODO: decide if this is needed
         """Setter for the cell segmentation object for this MerfishExperiment.
         """
@@ -49,7 +49,7 @@ class _AbsMFExperiment(ABC):
         If object is not initialized, resolve relevant paths, initialize, and
         return, otherwise, just return.
         """
-    @property
+    @property.setter
     def imgs(self):
         """Getter for the ImageDataset object for this MerfishExperiment.
         If object is not initialized, resolve relevant paths, initialize, and

@@ -136,8 +136,14 @@ def load_fov_positions(path: Path) -> pd.DataFrame:
     return positions
 
 
-class MerfishAnalysis:
-    """A class for saving and loading results from this software package."""
+class _AbsFileSys():
+
+    _schema = \
+    """
+    {
+    root: None
+    }
+    """
 
     def __init__(self, folderpath: str, save_to_subfolder: str = "") -> None:
         self.root = Path(folderpath)
@@ -170,7 +176,7 @@ class MerfishAnalysis:
 
     def has_cell_metadata(self) -> bool:
         return Path(self.save_path, "cell_metadata.csv").exists()
-
+    
     def save_linked_cells(self, links) -> None:
         with open(self.save_path / "linked_cells.txt", "w", encoding="utf8") as f:
             for link in links:
@@ -183,6 +189,9 @@ class MerfishAnalysis:
                 links.append(eval(line))
         return links
 
+    def has_linked_cells(self) -> bool:
+        raise NotImplementedError()
+
     def save_barcode_table(self, barcodes, dask=False) -> None:
         if dask:
             barcodes.to_csv(self.save_path / "detected_transcripts")
@@ -192,11 +201,43 @@ class MerfishAnalysis:
     def load_barcode_table(self) -> pd.DataFrame:
         return self.__load_dataframe("detected_transcripts.csv", add_region=True)
 
+    def has_barcode_table(self) -> bool:
+        raise NotImplementedError()
+
     def save_cell_by_gene_table(self, cellbygene) -> None:
         cellbygene.to_csv(self.save_path / "cell_by_gene.csv")
 
     def load_cell_by_gene_table(self) -> pd.DataFrame:
         return self.__load_dataframe("cell_by_gene.csv", add_region=False)
+
+    def has_cell_metadata(self) -> bool:
+        raise NotImplementedError()
+
+
+class MerfishFileSys(_AbsFileSys):
+    """A class for saving and loading results from this software package."""
+
+    _schema = \
+    """
+    {
+    root: {
+        output {
+            {name}
+        }
+        data {
+            {name}
+        }
+        analysis {
+            {name}
+        }
+    }
+    """
+
+    def __init__(self, folderpath:str, save_to_subfolder:str = "") -> None:
+        super().__init__(folderpath, save_to_subfolder)
+
+
+MerfishAnalysis = MerfishFileSys
 
 
 class MerlinOutput:
