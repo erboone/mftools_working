@@ -16,7 +16,7 @@ from mftools.fileio import MerfishAnalysis
 config:ConfigParser = ConfigParser()
 config.read('config.ini')
 ioconf = config["IO Options"]
-csconf = config["Cellpose"] # TODO: rename to 1_Cell_Segmentation
+csconf = config["2 Label Transfer"] # TODO: rename to 1_Cell_Segmentation
 
 MERSCOPE_DIR = ioconf['msdir']
 EXPERIMENT_NAME = ioconf['experiment']
@@ -25,7 +25,7 @@ MER_RAWDATA_DIR = "data"
 MER_OUTPUT_DIR = "output"
 
 CELLTYPE_KEY = "SOMETHING ELSE HERE"
-DATSET_KEY = DATSET_KEY
+DATSET_KEY = 'org_datset'
 
 # Output variables
 OUTPUT_DIRECTORY = ""
