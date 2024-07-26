@@ -1,7 +1,9 @@
-from abc import ABC
-from segmentation import CellSegmentation
-from fileio import ImageDataset, MerfishAnalysis
+from abc import ABC, abstractmethod
+from pathlib import Path
+import pandas as pd
 
+from .segmentation import CellSegmentation
+from .fileio import ImageDataset, MerfishAnalysis, MerscopeSchema, _AbsExperimentSchema
 
 class _AbsMFExperiment(ABC):
     """
@@ -11,24 +13,37 @@ class _AbsMFExperiment(ABC):
     want to apply the abstract class to a new experiment format (i.e. different schema for MERSCOPE and Xenium etc.)
     """
 
-    # TODO: improve this system
-    MER_RAWDATA_DIR = "data"
-    MER_OUTPUT_DIR = "output"
-    CELLPOSE_DIR = "cellpose"
-    MASKS_DIR = "masks" 
+    _schema_class = _AbsExperimentSchema
+    _segmentator_class = CellSegmentation
+    _imageset_class = ImageDataset
 
+    def __init__(self, root:str, name:str):
+        
 
-    def __init__(self, location:str, name:str):
+        # setting properties
+        self.root = root
+        self.name = name
+        self.files = self._schema_class(root, name)
 
-        image_dataset_path = f"{location}/{self.MER_RAWDATA_DIR}/{name}/" # Used to load imageset
-        expiriment_out_path = f"{location}/{self.MER_OUTPUT_DIR}/{name}/" # Used to find barcodes 
-        cellpose_out_path = f"{expiriment_out_path}/{self.CELLPOSE_DIR}/" # used to save final cellpose output
-        masks_out_path = f"{cellpose_out_path}{self.MASKS_DIR}/" # used to save masks
+        # Properties set using @property.setter; see below
+        # def namespace
+        self._segmentator_instance = None
+        self._imageset_instance = None
+        # These set the objects based of info in self.files; no args req.
+        self.seg
+        self.imgs
 
-        self.original = MerfishAnalysis(expiriment_out_path)
-        self.output = MerfishAnalysis(masks_out_path)
-        self.imgset = ImageDataset(image_dataset_path)
-        self.seg = CellSegmentation(imagedata=self.imgset, channel='dapi', zslice=3)
+    # TODO: Decide if this is needed
+    # @property
+    # def files(self):
+    #     """_summary_
+    #     Object built to retrieve files using a known mfexperiment schema
+    #     """
+    #     pass
+    
+    # @files.setter
+    # def files(self):
+    #     pass
 
     @property
     def seg(self):
@@ -36,12 +51,22 @@ class _AbsMFExperiment(ABC):
         If object is not initialized, resolve relevant paths, initialize, and
         return, otherwise, just return.
         """
+        if self._segmentator_instance is None:
+            self.seg = {}
+        return self._segmentator_instance
 
-    @property.setter
-    def seg(self):
-        # TODO: decide if this is needed
+    @seg.setter
+    def seg(self, kwargs:dict={}):
+        # TODO: Change this once implementation of CellSegmentation has been updated
         """Setter for the cell segmentation object for this MerfishExperiment.
         """
+        print('reached')
+        self._segmentator_instance = self._segmentator_class(
+            mask_folder = self.files['masks'],
+            output = MerfishAnalysis(self.files['output']),
+            **kwargs
+        )
+
 
     @property
     def imgs(self):
@@ -49,15 +74,91 @@ class _AbsMFExperiment(ABC):
         If object is not initialized, resolve relevant paths, initialize, and
         return, otherwise, just return.
         """
-    @property.setter
-    def imgs(self):
+        if self._imageset_instance is None:
+            self._imageset_instance = {}
+        return self._imageset_instance
+
+
+    @imgs.setter
+    def imgs(self, kwargs:dict={}):
         """Getter for the ImageDataset object for this MerfishExperiment.
         If object is not initialized, resolve relevant paths, initialize, and
         return, otherwise, just return.
         """
+        return self._imageset_class(
+            self.files['images'],
+            **kwargs
+        )
+
+
+    def __load_dataframe(self, name: str, add_region: bool) -> pd.DataFrame:
+        filename = self.save_path / name
+        if filename.exists():
+            return pd.read_csv(filename, index_col=0)
+        # Check if this is a multi-region MERSCOPE experiment
+        if list(self.root.glob("region_*")):
+            region_dfs = []
+            for region in list(self.root.glob("region_*")):
+                num = str(region).rsplit("_", maxsplit=1)[-1]
+                dataframe = pd.read_csv(region / name, index_col=0)
+                if add_region:
+                    dataframe["region"] = num
+                region_dfs.append(dataframe)
+            dataframe = pd.concat(region_dfs)
+            dataframe.to_csv(filename)
+            return dataframe
+        raise FileNotFoundError(filename)
+
+    def save_cell_metadata(self, celldata: pd.DataFrame) -> None:
+        celldata.to_csv(self.save_path / "cell_metadata.csv")
+
+    def load_cell_metadata(self) -> pd.DataFrame:
+        return self.__load_dataframe("cell_metadata.csv", add_region=True)
+
+    def has_cell_metadata(self) -> bool:
+        return Path(self.save_path, "cell_metadata.csv").exists()
+
+    def save_linked_cells(self, links) -> None:
+        with open(self.save_path / "linked_cells.txt", "w", encoding="utf8") as f:
+            for link in links:
+                print(repr(link), file=f)
+
+    def load_linked_cells(self):
+        links = []
+        with open(self.save_path / "linked_cells.txt", encoding="utf8") as f:
+            for line in f:
+                links.append(eval(line))
+        return links
+
+    def save_barcode_table(self, barcodes, dask=False) -> None:
+        if dask:
+            barcodes.to_csv(self.save_path / "detected_transcripts")
+        else:
+            barcodes.to_csv(self.save_path / "detected_transcripts.csv")
+
+    def load_barcode_table(self) -> pd.DataFrame:
+        return self.__load_dataframe("detected_transcripts.csv", add_region=True)
+
+    def save_cell_by_gene_table(self, cellbygene) -> None:
+        cellbygene.to_csv(self.save_path / "cell_by_gene.csv")
+
+    def load_cell_by_gene_table(self) -> pd.DataFrame:
+        return self.__load_dataframe("cell_by_gene.csv", add_region=False)
+    
+    @abstractmethod
+    def create_scanpy_object():
+        pass
         
 
+class MerscopeExperiment(_AbsMFExperiment):
 
+    _schema_class = MerscopeSchema
+
+    def __init__(self, root:Path, exp:str, alt_paths:dict=None):
+        super().__init__(root, exp)
+
+    def create_scanpy_object():
+        pass
 
 
 if __name__ == "__main__":
