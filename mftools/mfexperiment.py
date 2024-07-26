@@ -24,7 +24,7 @@ class _AbsMFExperiment(ABC):
         self.root = root
         self.name = name
         self.files = self._schema_class(root, name)
-
+        self.savepath = Path(self.files['cellpose'])
         # Properties set using @property.setter; see below
         # def namespace
         self._segmentator_instance:ImageDataset = None
@@ -97,7 +97,7 @@ class _AbsMFExperiment(ABC):
 
 
     def __load_dataframe(self, name: str, add_region: bool) -> pd.DataFrame:
-        filename = self.save_path / name
+        filename = self.savepath / name
         if filename.exists():
             return pd.read_csv(filename, index_col=0)
         # Check if this is a multi-region MERSCOPE experiment
@@ -115,37 +115,37 @@ class _AbsMFExperiment(ABC):
         raise FileNotFoundError(filename)
 
     def save_cell_metadata(self, celldata: pd.DataFrame) -> None:
-        celldata.to_csv(self.save_path / "cell_metadata.csv")
+        celldata.to_csv(self.savepath / "cell_metadata.csv")
 
     def load_cell_metadata(self) -> pd.DataFrame:
         return self.__load_dataframe("cell_metadata.csv", add_region=True)
 
     def has_cell_metadata(self) -> bool:
-        return Path(self.save_path, "cell_metadata.csv").exists()
+        return Path(self.savepath, "cell_metadata.csv").exists()
 
     def save_linked_cells(self, links) -> None:
-        with open(self.save_path / "linked_cells.txt", "w", encoding="utf8") as f:
+        with open(self.savepath / "linked_cells.txt", "w", encoding="utf8") as f:
             for link in links:
                 print(repr(link), file=f)
 
     def load_linked_cells(self):
         links = []
-        with open(self.save_path / "linked_cells.txt", encoding="utf8") as f:
+        with open(self.savepath / "linked_cells.txt", encoding="utf8") as f:
             for line in f:
                 links.append(eval(line))
         return links
 
     def save_barcode_table(self, barcodes, dask=False) -> None:
         if dask:
-            barcodes.to_csv(self.save_path / "detected_transcripts")
+            barcodes.to_csv(self.savepath / "detected_transcripts")
         else:
-            barcodes.to_csv(self.save_path / "detected_transcripts.csv")
+            barcodes.to_csv(self.savepath / "detected_transcripts.csv")
 
     def load_barcode_table(self) -> pd.DataFrame:
         return self.__load_dataframe("detected_transcripts.csv", add_region=True)
 
     def save_cell_by_gene_table(self, cellbygene) -> None:
-        cellbygene.to_csv(self.save_path / "cell_by_gene.csv")
+        cellbygene.to_csv(self.savepath / "cell_by_gene.csv")
 
     def load_cell_by_gene_table(self) -> pd.DataFrame:
         return self.__load_dataframe("cell_by_gene.csv", add_region=False)
