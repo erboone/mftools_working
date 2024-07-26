@@ -2,6 +2,8 @@
 import re
 import json
 import pickle
+from abc import ABC, abstractmethod
+from glob import glob
 from pathlib import Path
 from typing import Optional, Dict, Sequence
 
@@ -18,6 +20,7 @@ class _AbsExperimentSchema(ABC):
         }
 
     def __init__(self, root:str, exp:str, schema_mod:dict={}):
+        self._schema:dict[str, str] = None
         self._schema = self._default_schema
         for key, val in schema_mod.items():
             self._schema[key] = val
@@ -27,9 +30,14 @@ class _AbsExperimentSchema(ABC):
         self.fill = {'exp':exp, 'root':root}
 
     def __getitem__(self, path_key):
-        return Path(
-            self._schema[path_key].format(**self.fill)
-        )
+        matches = glob(self._schema[path_key].format(**self.fill))
+        if len(matches) > 1:
+            nl='\n' # <- for compatability with python<3.12
+            raise RuntimeError(
+                f"""{self.__class__} failed to resolve with key "{path_key}". Found conflicting paths:
+                {["{}{}".format(match, nl) for match in matches]}"""
+                )
+        return matches.pop()
     
     def _check_path():
         #TODO
@@ -50,14 +58,14 @@ class MerscopeSchema(_AbsExperimentSchema):
     @property
     def _default_schema(self):
         return {
-        'root': '{root}',
-        'data': '{root}/*data*/{exp}',
-        'output': '{root}/*output*/{exp}',
-        'analysis': '{root}/*analysis*/{exp}',
-        'images': '{root}/*data*/{exp}/data',
-        'settings': '{root}/*data*/{exp}/data/settings',
+        'root': '{root}/',
+        'data': '{root}/*data*/{exp}/',
+        'output': '{root}/*output*/{exp}/',
+        'analysis': '{root}/*analysis*/{exp}/',
+        'images': '{root}/*data*/{exp}/data/',
+        'settings': '{root}/*data*/{exp}/data/settings/',
         'cellpose': '{root}/*output*/{exp}/cellpose/',
-        'masks' : '{root}/*output*/{exp}/cellpose/masks',
+        'masks' : '{root}/*output*/{exp}/cellpose/masks/',
         #'data_org': NotImplemented
         }
     
@@ -375,13 +383,13 @@ class MerlinOutput:
 
 
 class ImageDataset:
-    def __init__(self, folderpath: str, data_organization: str = None) -> None:
+    def __init__(self, folderpath: str, data_organization:str = None) -> None:
         self.root = Path(folderpath)
         if isinstance(data_organization, str):
             self.data_organization = load_data_organization(data_organization)
         elif isinstance(data_organization, pd.DataFrame):
             self.data_organization = data_organization
-        elif data_organization is None and Path(self.root, "dataorganization.csv").exists():
+        elif data_organization is None and list(self.root.glob('dataorganization.csv'))[0].exists():
             self.data_organization = load_data_organization(self.root / "dataorganization.csv")
         if self.data_organization is not None:
             self.regex = {}

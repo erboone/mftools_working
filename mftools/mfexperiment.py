@@ -27,11 +27,13 @@ class _AbsMFExperiment(ABC):
 
         # Properties set using @property.setter; see below
         # def namespace
-        self._segmentator_instance = None
-        self._imageset_instance = None
+        self._segmentator_instance:ImageDataset = None
+        self._imageset_instance:CellSegmentation = None
         # These set the objects based of info in self.files; no args req.
-        self.seg
+        # Note: For now, imgs must be defined before seg.
         self.imgs
+        self.seg
+        
 
     # TODO: Decide if this is needed
     # @property
@@ -57,6 +59,7 @@ class _AbsMFExperiment(ABC):
 
     @seg.setter
     def seg(self, kwargs:dict={}):
+        print("Setting segmentor")
         # TODO: Change this once implementation of CellSegmentation has been updated
         """Setter for the cell segmentation object for this MerfishExperiment.
         """
@@ -64,6 +67,7 @@ class _AbsMFExperiment(ABC):
         self._segmentator_instance = self._segmentator_class(
             mask_folder = self.files['masks'],
             output = MerfishAnalysis(self.files['output']),
+            imagedata=self.imgs,
             **kwargs
         )
 
@@ -75,18 +79,19 @@ class _AbsMFExperiment(ABC):
         return, otherwise, just return.
         """
         if self._imageset_instance is None:
-            self._imageset_instance = {}
+            self.imgs = {}
         return self._imageset_instance
 
 
     @imgs.setter
     def imgs(self, kwargs:dict={}):
+        print('Setting imageset')
         """Getter for the ImageDataset object for this MerfishExperiment.
         If object is not initialized, resolve relevant paths, initialize, and
         return, otherwise, just return.
         """
-        return self._imageset_class(
-            self.files['images'],
+        self._imageset_instance = self._imageset_class(
+            self.files['data'],
             **kwargs
         )
 

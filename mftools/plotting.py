@@ -424,10 +424,10 @@ def create_color_image(
     return img
 
 def fov_show(
+        fov:int,
         seg=None, # passing in all these objects feels a little silly
-        imset=None, # But also, in general, I'm not happy with this implementation.
-        output=None, # 
-        fov:int=-1, 
+        imgs=None, # But also, in general, I'm not happy with this implementation.
+        output=None, # Move it to MerfishAnalysis
         channel:str='DAPI',
         show:bool=True, 
         plot_mask:bool=True, 
@@ -443,7 +443,7 @@ def fov_show(
     mask = seg[fov]
 
     if plot_channel:
-        channel = imset.load_image(channel=seg.channel, fov=fov, max_projection=True)
+        channel = imgs.load_image(channel=seg.channel, fov=fov, max_projection=True)
         plt.imshow(channel, cmap="gray")
     
     if plot_mask: 
