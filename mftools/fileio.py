@@ -9,6 +9,58 @@ import h5py
 import numpy as np
 import pandas as pd
 
+class _AbsExperimentSchema(ABC):
+    
+    @property
+    @abstractmethod
+    def _default_schema(self):
+        return {
+        }
+
+    def __init__(self, root:str, exp:str, schema_mod:dict={}):
+        self._schema = self._default_schema
+        for key, val in schema_mod.items():
+            self._schema[key] = val
+        self.root = root
+        self.exp = exp
+        # TODO: consider making fill private and handeling with getters/setters
+        self.fill = {'exp':exp, 'root':root}
+
+    def __getitem__(self, path_key):
+        return Path(
+            self._schema[path_key].format(**self.fill)
+        )
+    
+    def _check_path():
+        #TODO
+        """_summary_
+        Check access to a certain directory, do not stop but print out report to be used by "access report"
+        """
+        pass
+
+    def _access_report():
+        # TODO
+        """_summary_
+        Check all directories and print a report for warning/diagnostics.
+        """
+
+
+class MerscopeSchema(_AbsExperimentSchema):
+
+    @property
+    def _default_schema(self):
+        return {
+        'root': '{root}',
+        'data': '{root}/*data*/{exp}',
+        'output': '{root}/*output*/{exp}',
+        'analysis': '{root}/*analysis*/{exp}',
+        'images': '{root}/*data*/{exp}/data',
+        'settings': '{root}/*data*/{exp}/data/settings',
+        'cellpose': '{root}/*output*/{exp}/cellpose/',
+        'masks' : '{root}/*output*/{exp}/cellpose/masks',
+        #'data_org': NotImplemented
+        }
+    
 
 def search_for_mask_file(segmask_dir: Path, fov: int) -> Path:
     """Find the filename for the segmentation mask of the given FOV.
