@@ -430,6 +430,7 @@ def fov_show(
         output=None, # Move it to MerfishAnalysis
         channel:str='DAPI',
         show:bool=True, 
+        ax:Axes=None,
         plot_mask:bool=True, 
         plot_channel:bool=True,
         plot_centroids:bool=False,
@@ -437,8 +438,10 @@ def fov_show(
     ) -> None | Axes: 
     
     # Init figure
-    fig, ax = plt.subplots(1, 1)
-    plt.figure(dpi=150)
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+
+    #plt.figure(dpi=150)
 
     mask = seg[fov]
 
