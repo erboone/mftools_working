@@ -74,13 +74,16 @@ experiment = MerscopeExperiment(MERSCOPE_DIR, EXPERIMENT_NAME)
 e = experiment
 
 fig:Figure; axs:list[list[Axes]]
-fig, axs = plt.subplots(2, len(TEST_FOVS))
+# fig, axs = plt.subplots(2, len(TEST_FOVS))
 
 # TODO: come back to this; implement plotting and saving a couple of test segmentations
 for i, fov in enumerate(TEST_FOVS):
-    fov_show(seg=e.seg, imgs=e.imgs, fov=fov, show=False, ax=axs[0][i])
-    fig.savefig(f"test_{fov}")
+    fig, ax = plt.subplots(1, 1)
+    fov_show(seg=e.seg, imgs=e.imgs, fov=fov, show=False, ax=ax)
+    fig.savefig(f"quality_control/test_{fov}")
 
+
+exit()
 # either load or create meatadata, then save if not already
 metadata = e.seg.metadata
 e.save_cell_metadata(metadata)
