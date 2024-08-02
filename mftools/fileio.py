@@ -2,6 +2,7 @@
 import re
 import json
 import pickle
+from os import mkdir, path
 from abc import ABC, abstractmethod
 from glob import glob
 from pathlib import Path
@@ -16,6 +17,11 @@ class _AbsExperimentSchema(ABC):
     @property
     @abstractmethod
     def _default_schema(self):
+        """
+        property that holds the default file schema for a certain experiemnt
+        format, e.g. MERSCOPE, Xenium, etc. Should only point to directories;
+        files should be found using glob as needed downstream.
+        """
         return {
         }
 
@@ -30,13 +36,28 @@ class _AbsExperimentSchema(ABC):
         self.fill = {'exp':exp, 'root':root}
 
     def __getitem__(self, path_key):
-        matches = glob(self._schema[path_key].format(**self.fill))
+        # Sanitize string
+        san_path = Path(self._schema[path_key].format(**self.fill))
+        # Search for matches
+        matches = glob(san_path.as_posix())
+
         if len(matches) > 1:
-            nl='\n' # <- for compatability with python<3.12
+            nl='\n' # <- for compatability with python<3.12 fstrings
             raise RuntimeError(
                 f"""{self.__class__} failed to resolve with key "{path_key}". Found conflicting paths:
                 {["{}{}".format(match, nl) for match in matches]}"""
                 )
+        elif len(matches) < 1:
+            # Check for unique and extant parent, then create and throw warning
+            # or fail and throw error
+            par_match = glob(san_path.parent.as_posix())
+            if len(par_match) == 1:
+                Warning(f"\'{san_path}\' does not exist, but will be created")
+                mkdir(path.join(par_match[0], san_path.stem))
+                return san_path
+            else:
+                raise RuntimeError(f"\'{san_path}\' has no unique extant parent, found:{nl}{par_match}")
+        
         return matches.pop()
     
     def _check_path():
