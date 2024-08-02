@@ -17,25 +17,30 @@ class _AbsMFExperiment(ABC):
     _segmentator_class = CellSegmentation
     _imageset_class = ImageDataset
 
-    def __init__(self, root:str, name:str):
-        
+    def __init__(self, 
+            root:str,
+            name:str,
+            alt_paths:dict={},
+            seg_kwargs:dict={},
+            img_kwargs:dict={}
+        ):
 
         # setting properties
         self.root = root
         self.name = name
-        self.files = self._schema_class(root, name)
+        self.files = self._schema_class(root, name, schema_mod=alt_paths)
         self.savepath = Path(self.files['cellpose'])
         # Properties set using @property.setter; see below
         # def namespace
-        self._segmentator_instance:ImageDataset = None
+        self._segmentator_instance:ImageDataset = self._segmentator_class
         self._imageset_instance:CellSegmentation = None
-        # These set the objects based of info in self.files; no args req.
+        # These set the objects based of info in self.files; supplimented
+        # by kwargs.
         # Note: For now, imgs must be defined before seg.
-        self.imgs
-        self.seg
-        
+        self.imgs_set(**img_kwargs)
+        self.seg_set(**seg_kwargs)        
 
-    # TODO: Decide if this is needed
+    # TODO: Decide if this is need.__s
     # @property
     # def files(self):
     #     """_summary_
@@ -47,23 +52,21 @@ class _AbsMFExperiment(ABC):
     # def files(self):
     #     pass
 
-    @property
-    def seg(self):
+    def seg_get(self, **kwargs):
         """Getter for the CellSegmentation object for this MerfishExperiment.
         If object is not initialized, resolve relevant paths, initialize, and
         return, otherwise, just return.
         """
+        # This check may not be needed anymore
         if self._segmentator_instance is None:
-            self.seg = {}
+            self.seg.__setattr__()
         return self._segmentator_instance
 
-    @seg.setter
-    def seg(self, kwargs:dict={}):
+    def seg_set(self, **kwargs):
         print("Setting segmentor")
         # TODO: Change this once implementation of CellSegmentation has been updated
         """Setter for the cell segmentation object for this MerfishExperiment.
         """
-        print('reached')
         self._segmentator_instance = self._segmentator_class(
             mask_folder = self.files['masks'],
             output = MerfishAnalysis(self.files['output']),
@@ -71,20 +74,18 @@ class _AbsMFExperiment(ABC):
             **kwargs
         )
 
+    seg = property(seg_get, seg_set)
 
-    @property
-    def imgs(self):
+    def imgs_get(self):
         """Getter for the ImageDataset object for this MerfishExperiment.
         If object is not initialized, resolve relevant paths, initialize, and
         return, otherwise, just return.
         """
-        if self._imageset_instance is None:
-            self.imgs = {}
         return self._imageset_instance
 
 
-    @imgs.setter
-    def imgs(self, kwargs:dict={}):
+    # @imgs.setter
+    def imgs_set(self, **kwargs):
         print('Setting imageset')
         """Getter for the ImageDataset object for this MerfishExperiment.
         If object is not initialized, resolve relevant paths, initialize, and
@@ -95,6 +96,7 @@ class _AbsMFExperiment(ABC):
             **kwargs
         )
 
+    imgs = property(imgs_get, imgs_set)
 
     def __load_dataframe(self, name: str, add_region: bool) -> pd.DataFrame:
         filename = self.savepath / name
@@ -159,8 +161,15 @@ class MerscopeExperiment(_AbsMFExperiment):
 
     _schema_class = MerscopeSchema
 
-    def __init__(self, root:Path, exp:str, alt_paths:dict=None):
-        super().__init__(root, exp)
+    def __init__(self, 
+            root:str,
+            name:str,
+            alt_paths:dict={},
+            seg_kwargs:dict={},
+            img_kwargs:dict={}
+        ):
+        super().__init__(root, name, alt_paths=alt_paths, seg_kwargs=seg_kwargs,
+                          img_kwargs=img_kwargs)
 
     def create_scanpy_object():
         pass
