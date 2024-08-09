@@ -70,7 +70,14 @@ TEST_FOVS = [150, 300, 500]
     
 
 # Use file path like format ("/mnt/merfish12/MERSCOPE/merfish_raw_data/202401261424_20240126M134UWA7648CX22PuS6_VMSC10102
-experiment = MerscopeExperiment(MERSCOPE_DIR, EXPERIMENT_NAME)
+experiment = MerscopeExperiment(MERSCOPE_DIR, EXPERIMENT_NAME, 
+            alt_paths={'cellpose': './test_cellpose/', 'masks':'./test_cellpose/masks'},
+            seg_kwargs={
+                'zslice': ZSLICE, 
+                'channel': CHANNEL},
+                #'model_path': MODEL_PATH},
+            img_kwargs={}
+        )
 e = experiment
 
 fig:Figure; axs:list[list[Axes]]
@@ -80,6 +87,7 @@ fig:Figure; axs:list[list[Axes]]
 for i, fov in enumerate(TEST_FOVS):
     fig, ax = plt.subplots(1, 1)
     fov_show(seg=e.seg, imgs=e.imgs, fov=fov, show=False, ax=ax)
+    # TODO: include impelmentation to create the qc directory if not exist
     fig.savefig(f"quality_control/test_{fov}")
 
 
