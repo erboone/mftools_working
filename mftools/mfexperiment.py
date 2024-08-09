@@ -32,8 +32,8 @@ class _AbsMFExperiment(ABC):
         self.savepath = Path(self.files['cellpose'])
         # Properties set using @property.setter; see below
         # def namespace
-        self._segmentator_instance:ImageDataset = self._segmentator_class
-        self._imageset_instance:CellSegmentation = None
+        self._segmentator_instance:CellSegmentation = self._segmentator_class
+        self._imageset_instance:ImageDataset = None
         # These set the objects based of info in self.files; supplimented
         # by kwargs.
         # Note: For now, imgs must be defined before seg.
