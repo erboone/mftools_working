@@ -40,7 +40,7 @@ CELLPOSE_DIR = f"./cellpose_{EXPERIMENT_NAME}" # TODO: for testing, change later
 MASKS_DIR = "masks" 
 
 # Script params
-ZSLICE = csconf['zslice']
+ZSLICE = int(csconf['zslice'])
 CHANNEL = csconf['channel']
 MODEL= ""
 TEST_FOVS = [150, 300, 500]
