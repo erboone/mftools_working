@@ -69,13 +69,21 @@ TEST_FOVS = [150, 300, 500]
 #         raise RuntimeError(f"Attempted to create \"{path}\" but failed. Check that you have permission.")
     
 
+# THIS IS FOR TESTING: REMOVE WHEN NECESSARY
+from glob import glob
+temp = glob('/home/eboone/mftools/test_cellpose_script/masks/*')
+
+for s in temp:
+    os.remove(s)
+
 # Use file path like format ("/mnt/merfish12/MERSCOPE/merfish_raw_data/202401261424_20240126M134UWA7648CX22PuS6_VMSC10102
+MODEL_PATH = '/home/eboone/CellSegmentation/cp_models/CP_20240227_000004_staged' 
 experiment = MerscopeExperiment(MERSCOPE_DIR, EXPERIMENT_NAME, 
-            alt_paths={'cellpose': './test_cellpose/', 'masks':'./test_cellpose/masks'},
+            alt_paths={'cellpose': './test_cellpose_script/', 'masks':'./test_cellpose_script/masks'},
             seg_kwargs={
                 'zslice': ZSLICE, 
-                'channel': CHANNEL},
-                #'model_path': MODEL_PATH},
+                'channel': CHANNEL,
+                'model_path':MODEL_PATH},
             img_kwargs={}
         )
 e = experiment
@@ -90,7 +98,7 @@ for i, fov in enumerate(TEST_FOVS):
     # TODO: include impelmentation to create the qc directory if not exist
     fig.savefig(f"quality_control/test_{fov}")
 
-
+print("finished")
 exit()
 # either load or create meatadata, then save if not already
 metadata = e.seg.metadata
