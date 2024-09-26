@@ -19,3 +19,7 @@ def set(key: str, value: float, silent: bool = False) -> None:
 
 def get(key: str) -> float:
     return stats[key]
+
+
+def cluster_correlation_coeficient():
+    pass

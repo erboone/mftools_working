@@ -90,7 +90,7 @@ for i, fov in enumerate(TEST_FOVS):
     # TODO: include impelmentation to create the qc directory if not exist
     fig.savefig(f"quality_control/test_{fov}")
 
-
+print("finished")
 exit()
 # either load or create meatadata, then save if not already
 metadata = e.seg.metadata

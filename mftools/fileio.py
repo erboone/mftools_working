@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from glob import glob
 from pathlib import Path
 from typing import Optional, Dict, Sequence
+from 
 
 import h5py
 import numpy as np
@@ -24,6 +25,11 @@ class _AbsExperimentSchema(ABC):
         """
         return {
         }
+
+    def _validate_schema(schema:dict):
+        # implement validation of a schema to guarentee minimal construction
+        if 'root' not in schema:
+            pass 
 
     def __init__(self, root:str, exp:str, schema_mod:dict={}):
         self._schema:dict[str, str] = None
@@ -79,17 +85,27 @@ class MerscopeSchema(_AbsExperimentSchema):
     @property
     def _default_schema(self):
         return {
-        'root': '{root}/',
-        'data': '{root}/*data*/{exp}/',
-        'output': '{root}/*output*/{exp}/',
-        'analysis': '{root}/*analysis*/{exp}/',
-        'images': '{root}/*data*/{exp}/data/',
-        'settings': '{root}/*data*/{exp}/data/settings/',
-        'cellpose': '{root}/*output*/{exp}/cellpose/',
-        'masks' : '{root}/*output*/{exp}/cellpose/masks/',
-        #'data_org': NotImplemented
+            'root': '{root}/',
+            'data': '{root}/*data*/{exp}/',
+            'output': '{root}/*output*/{exp}/',
+            'analysis': '{root}/*analysis*/{exp}/',
+            'images': '{root}/*data*/{exp}/data/',
+            'settings': '{root}/*data*/{exp}/data/settings/',
+            'cellpose': '{root}/*output*/{exp}/cellpose/',
+            'masks' : '{root}/*output*/{exp}/cellpose/masks/',
+            #'data_org': NotImplemented
         }
     
+class XeniumSchema(_AbsExperimentSchema):
+    
+    def _default_schema(self):
+        return {
+            'root':'{root}/',
+            'exp': '{root}/*/{exp}',
+            'reseg': '{root}/*/{exp}/{reseg}/outs/'
+        }
+    
+    def __init__()
 
 def search_for_mask_file(segmask_dir: Path, fov: int) -> Path:
     """Find the filename for the segmentation mask of the given FOV.
