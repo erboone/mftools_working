@@ -236,13 +236,14 @@ class CellSegmentation:
     def segment_fov(self, fov: int):
         segim = self.imagedata.load_image(fov=fov, channel=self.channel, zslice=self.zslice)
         if segim.ndim == 2:
-            mask, _, _, _ = self.model.eval(
+            seg_out = self.model.eval(
                 segim,
                 channels=[0, 0],
                 diameter=80,
                 cellprob_threshold=-4,
                 flow_threshold=1.25,
             )
+            mask = seg_out[0]
             mask = remove_small_cells_from_mask(mask, min_volume=2500)
             mask = expand_labels(mask, 3)
         elif segim.ndim == 3:
