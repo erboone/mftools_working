@@ -7,7 +7,6 @@ from abc import ABC, abstractmethod
 from glob import glob
 from pathlib import Path
 from typing import Optional, Dict, Sequence
-from 
 
 import h5py
 import numpy as np
@@ -31,7 +30,7 @@ class _AbsExperimentSchema(ABC):
         if 'root' not in schema:
             pass 
 
-    def __init__(self, root:str, exp:str, schema_mod:dict={}):
+    def __init__(self, root:str, exp:str, schema_mod:dict={}, fill_mod:dict={}):
         self._schema:dict[str, str] = None
         self._schema = self._default_schema
         for key, val in schema_mod.items():
@@ -40,6 +39,8 @@ class _AbsExperimentSchema(ABC):
         self.exp = exp
         # TODO: consider making fill private and handeling with getters/setters
         self.fill = {'exp':exp, 'root':root}
+        for key, val in fill_mod.items():
+            self.fill[key] = val
 
     def __getitem__(self, path_key):
         # Sanitize string
@@ -102,11 +103,9 @@ class XeniumSchema(_AbsExperimentSchema):
         return {
             'root':'{root}/',
             'exp': '{root}/*/{exp}',
-            'reseg': '{root}/*/{exp}/{reseg}/outs/'
+            'reseg': '{root}/*/{exp}/*NoExpansion*/outs/' # this is a sloppy way of setting default, fix at some point
         }
     
-    def __init__()
-
 def search_for_mask_file(segmask_dir: Path, fov: int) -> Path:
     """Find the filename for the segmentation mask of the given FOV.
 
