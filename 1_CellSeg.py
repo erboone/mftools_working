@@ -75,15 +75,14 @@ temp = glob('/home/eboone/mftools/test_cellpose_script/masks/*')
 
 for s in temp:
     os.remove(s)
-
+print(MERSCOPE_DIR, EXPERIMENT_NAME)
 # Use file path like format ("/mnt/merfish12/MERSCOPE/merfish_raw_data/202401261424_20240126M134UWA7648CX22PuS6_VMSC10102
 MODEL_PATH = '/home/eboone/CellSegmentation/cp_models/CP_20240227_000004_staged' 
 experiment = MerscopeExperiment(MERSCOPE_DIR, EXPERIMENT_NAME, 
             alt_paths={'cellpose': './test_cellpose_script/', 'masks':'./test_cellpose_script/masks'},
             seg_kwargs={
                 'zslice': ZSLICE, 
-                'channel': CHANNEL,
-                'model_path':MODEL_PATH},
+                'channel': CHANNEL},
             img_kwargs={}
         )
 e = experiment
@@ -98,19 +97,21 @@ for i, fov in enumerate(TEST_FOVS):
     # TODO: include impelmentation to create the qc directory if not exist
     fig.savefig(f"quality_control/test_{fov}")
 
-print("finished")
-exit()
+from datetime import datetime
+print("start metadata:", datetime.now())
 # either load or create meatadata, then save if not already
 metadata = e.seg.metadata
 e.save_cell_metadata(metadata)
+print("end metadata:", datetime.now())
 
 
 # load barcodes, assign to cells, save to disk
-
+print("start barcodes:", datetime.now())
 barcodes = e.load_barcode_table()
 assign_to_cells(barcodes, e.seg)
 link_cell_ids(barcodes, e.seg.linked_cells)
 e.save_barcode_table(barcodes)
+print("end barcodes:", datetime.now())
 
 barcodes = e.load_barcode_table()
 cbgtab = create_cell_by_gene_table(barcodes)
