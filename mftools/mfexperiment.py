@@ -1,9 +1,12 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 import pandas as pd
+import scanpy as sc
+from glob import glob
 
 from .segmentation import CellSegmentation
-from .fileio import ImageDataset, MerfishAnalysis, MerscopeSchema, _AbsExperimentSchema
+from .fileio import ImageDataset, MerfishAnalysis
+from .fileio import _AbsExperimentSchema, MerscopeSchema, XeniumSchema 
 
 class _AbsMFExperiment(ABC):
     """
@@ -99,13 +102,16 @@ class _AbsMFExperiment(ABC):
     imgs = property(imgs_get, imgs_set)
 
     def __load_dataframe(self, name: str, add_region: bool) -> pd.DataFrame:
-        filename = self.savepath / name
+        location = self.files['output']
+        filename = Path(f'{location}/{name}')
         if filename.exists():
             return pd.read_csv(filename, index_col=0)
         # Check if this is a multi-region MERSCOPE experiment
-        if list(self.root.glob("region_*")):
+        print()
+        if list(glob(f'{location}/region_*')):
             region_dfs = []
-            for region in list(self.root.glob("region_*")):
+            for region in list(glob(f'{location}/region_*')):
+                region = Path(region)
                 num = str(region).rsplit("_", maxsplit=1)[-1]
                 dataframe = pd.read_csv(region / name, index_col=0)
                 if add_region:
@@ -156,7 +162,6 @@ class _AbsMFExperiment(ABC):
     def create_scanpy_object():
         pass
         
-
 class MerscopeExperiment(_AbsMFExperiment):
 
     _schema_class = MerscopeSchema
@@ -171,9 +176,57 @@ class MerscopeExperiment(_AbsMFExperiment):
         super().__init__(root, name, alt_paths=alt_paths, seg_kwargs=seg_kwargs,
                           img_kwargs=img_kwargs)
 
-    def create_scanpy_object():
-        pass
+    def create_scanpy_object(self):
+        from .cellgene import create_scanpy_object
+        merscope_ad = MerfishAnalysis(self.files['cellpose'])
+        adata = create_scanpy_object(merscope_ad)
+        return adata
 
+class XeniumExperiment(_AbsMFExperiment):
+    # This class mostly exists to access files
+    # The existing image access class is heavily biased to MERSCOPE
+    # Adding Xenium will be a lot of work.
+    _schema_class = XeniumSchema
+    _segmentator_class = object
+
+    def __init__(self, 
+            root:str,
+            name:str,
+            alt_paths:dict={},
+            seg_kwargs:dict={},
+            img_kwargs:dict={'data_organization':'/mnt/merfish15/MERSCOPE/data/202407221121_20240722M176BICANRen22_VMSC10002/dataorganization.csv'}
+        ):
+        super().__init__(root, name, alt_paths=alt_paths, seg_kwargs=seg_kwargs,
+                          img_kwargs=img_kwargs)
+
+    def seg_set(self, **kwargs):
+        print("Setting segmentor")
+        # TODO: Change this once implementation of CellSegmentation has been updated
+        """Setter for the cell segmentation object for this MerfishExperiment.
+        """
+        self._segmentator_instance = object
+
+    def create_scanpy_object(self):
+        xenium_ad = sc.read_10x_h5(f"{self.files['reseg']}/cell_feature_matrix.h5")
+        df = pd.read_csv(f"{self.files['reseg']}/cells.csv.gz", index_col=0)
+        xenium_ad.obsm["X_spatial"] = df.loc[xenium_ad.obs_names][["x_centroid", "y_centroid"]].to_numpy()
+        return xenium_ad
+
+    # def seg_get(self, **kwargs):
+    #     """Getter for the CellSegmentation object for this MerfishExperiment.
+    #     If object is not initialized, resolve relevant paths, initialize, and
+    #     return, otherwise, just return.
+    #     """
+    #     # This check may not be needed anymore
+    #     return None 
+
+    # def seg_set(self, **kwargs):
+    #     print("Setting segmentor")
+    #     # TODO: Change this once implementation of CellSegmentation has been updated
+    #     """Setter for the cell segmentation object for this MerfishExperiment.
+    #     """
+    #     self._segmentator_instance = None
+    # seg = property(seg_get, seg_set)
 
 if __name__ == "__main__":
     print("this works")
