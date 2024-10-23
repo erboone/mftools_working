@@ -1,0 +1,32 @@
+package:
+  name: mftools
+  version: "0.1"
+
+source:
+  git_url: https://github.com/ilanschnell/bsdiff4.git
+  # git_rev: 1.1.4 # (Defaults to "HEAD")
+  git_depth: 1 # (Defaults to -1/not shallow)
+
+#TODO: Add build section
+
+requirements:
+  build:
+    - python
+    - setuptools
+
+  run:
+    - python
+    - scanpy
+    - pandas
+    - numpy
+    - cellpose 
+    - faiss
+    - scikit-image
+    - matplotlib
+
+# test:
+#   imports:
+#     -
+
+about:
+  home:

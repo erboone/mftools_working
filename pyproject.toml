@@ -2,12 +2,9 @@
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools.packages.find]
-exclude = ['scripts', 'wip']
-
 [project]
-name = "merfish-tools"
-version = "0.0.2"
+name = "mftools"
+version = "0.1"
 dependencies = [
     "numpy",
     "pandas",
@@ -20,5 +17,6 @@ dependencies = [
     "scipy",
     "faiss-cpu",
     "h5py",
-    "cellpose"
+    "cellpose",
+    "Pyrebase4" # makes installation work ¯\_(ツ)_/¯
 ]
