@@ -163,3 +163,4 @@ cython_debug/
 
 # For testing
 cellpose/
+test.py
