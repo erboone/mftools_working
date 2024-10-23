@@ -48,8 +48,8 @@ class _AbsExperimentSchema(ABC):
         # Search for matches
         matches = glob(san_path.as_posix())
 
+        nl='\n' # <- for compatability with python<3.12 fstrings
         if len(matches) > 1:
-            nl='\n' # <- for compatability with python<3.12 fstrings
             raise RuntimeError(
                 f"""{self.__class__} failed to resolve with key "{path_key}". Found conflicting paths:
                 {["{}{}".format(match, nl) for match in matches]}"""
@@ -99,11 +99,17 @@ class MerscopeSchema(_AbsExperimentSchema):
     
 class XeniumSchema(_AbsExperimentSchema):
     
+    @property
     def _default_schema(self):
         return {
             'root':'{root}/',
             'exp': '{root}/*/{exp}',
-            'reseg': '{root}/*/{exp}/*NoExpansion*/outs/' # this is a sloppy way of setting default, fix at some point
+            'reseg': '{root}/*/{exp}/*NoExpansion*/outs/', # this is a sloppy way of setting default, fix at some point
+            'cellpose': '/mnt/merfish15/MERSCOPE/output/202407221121_20240722M176BICANRen22_VMSC10002/cellpose',
+            'masks': '/mnt/merfish15/MERSCOPE/output/202407221121_20240722M176BICANRen22_VMSC10002/cellpose/masks', # this is to fit contructor built for MERSCOPE dir
+            'data': '/mnt/merfish15/MERSCOPE/data/202407221121_20240722M176BICANRen22_VMSC10002/data',
+
+
         }
     
 def search_for_mask_file(segmask_dir: Path, fov: int) -> Path:
