@@ -18,5 +18,7 @@ dependencies = [
     "faiss-cpu",
     "h5py",
     "cellpose",
-    "Pyrebase4" # makes installation work ¯\_(ツ)_/¯
 ]
+
+[tool.setuptools]
+packages = ["mftools"]
