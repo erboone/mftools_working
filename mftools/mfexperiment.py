@@ -66,7 +66,7 @@ class _AbsMFExperiment(ABC):
         return self._segmentator_instance
 
     def seg_set(self, **kwargs):
-        print("Setting segmentor")
+        # print("Setting segmentor")
         # TODO: Change this once implementation of CellSegmentation has been updated
         """Setter for the cell segmentation object for this MerfishExperiment.
         """
@@ -89,7 +89,7 @@ class _AbsMFExperiment(ABC):
 
     # @imgs.setter
     def imgs_set(self, **kwargs):
-        print('Setting imageset')
+        # print('Setting imageset')
         """Getter for the ImageDataset object for this MerfishExperiment.
         If object is not initialized, resolve relevant paths, initialize, and
         return, otherwise, just return.
