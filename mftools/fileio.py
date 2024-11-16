@@ -97,6 +97,22 @@ class MerscopeSchema(_AbsExperimentSchema):
             #'data_org': NotImplemented
         }
     
+class SmallMerscopeSchema(_AbsExperimentSchema):
+
+    @property
+    def _default_schema(self):
+        return {
+            'root': '{root}/',
+            'data': '{root}/{exp}/',
+            'output': '{root}/{exp}/',
+            'analysis': '{root}/{exp}/',
+            'images': '{root}/{exp}/data/',
+            'settings': '{root}/{exp}/data/settings/',
+            'cellpose': '{root}/{exp}/',
+            'masks' : '{root}/{exp}/cellpose/masks/',
+            #'data_org': NotImplemented
+        }
+
 class XeniumSchema(_AbsExperimentSchema):
     
     @property

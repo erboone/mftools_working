@@ -6,7 +6,7 @@ from glob import glob
 
 from .segmentation import CellSegmentation
 from .fileio import ImageDataset, MerfishAnalysis
-from .fileio import _AbsExperimentSchema, MerscopeSchema, XeniumSchema 
+from .fileio import _AbsExperimentSchema, MerscopeSchema, SmallMerscopeSchema, XeniumSchema 
 
 class _AbsMFExperiment(ABC):
     """
@@ -19,6 +19,15 @@ class _AbsMFExperiment(ABC):
     _schema_class = _AbsExperimentSchema
     _segmentator_class = CellSegmentation
     _imageset_class = ImageDataset
+
+    # def __new__(cls,
+    #         root:str,
+    #         name:str,
+    #         alt_paths:dict={},
+    #         seg_kwargs:dict={},
+    #         img_kwargs:dict={}
+    #     ):
+    #     pass
 
     def __init__(self, 
             root:str,
@@ -70,12 +79,15 @@ class _AbsMFExperiment(ABC):
         # TODO: Change this once implementation of CellSegmentation has been updated
         """Setter for the cell segmentation object for this MerfishExperiment.
         """
-        self._segmentator_instance = self._segmentator_class(
-            mask_folder = self.files['masks'],
-            output = MerfishAnalysis(self.files['output']),
-            imagedata=self.imgs,
-            **kwargs
-        )
+        if self._segmentator_class is None:
+            self._segmentator_instance = object
+        else:    
+            self._segmentator_instance = self._segmentator_class(
+                mask_folder = self.files['masks'],
+                output = MerfishAnalysis(self.files['output']),
+                imagedata=self.imgs,
+                **kwargs
+            )
 
     seg = property(seg_get, seg_set)
 
@@ -94,10 +106,13 @@ class _AbsMFExperiment(ABC):
         If object is not initialized, resolve relevant paths, initialize, and
         return, otherwise, just return.
         """
-        self._imageset_instance = self._imageset_class(
-            self.files['data'],
-            **kwargs
-        )
+        if self._imageset_class is None:
+            _imageset_instance = object
+        else:
+            self._imageset_instance = self._imageset_class(
+                self.files['data'],
+                **kwargs
+            )
 
     imgs = property(imgs_get, imgs_set)
 
@@ -165,6 +180,8 @@ class _AbsMFExperiment(ABC):
 class MerscopeExperiment(_AbsMFExperiment):
 
     _schema_class = MerscopeSchema
+    _segmentator_class = CellSegmentation
+    _imageset_class = ImageDataset
 
     def __init__(self, 
             root:str,
@@ -181,6 +198,52 @@ class MerscopeExperiment(_AbsMFExperiment):
         merscope_ad = MerfishAnalysis(self.files['cellpose'])
         adata = create_scanpy_object(merscope_ad)
         return adata
+    
+class SmallMerscopeExperiment(_AbsMFExperiment):
+
+    _schema_class = SmallMerscopeSchema
+    _segmentator_class = None
+    _imageset_class = None
+
+    
+
+    def __init__(self,
+            root:str,
+            name:str,
+            alt_paths:dict={},
+            seg_kwargs:dict={},
+            img_kwargs:dict={}
+        ):
+        
+        super().__init__(root, name, alt_paths=alt_paths, 
+                        seg_kwargs=seg_kwargs,
+                        img_kwargs=img_kwargs)
+        
+    def create_scanpy_object(self):
+        data = self.files['data']
+        h5_paths = glob(f'{data}/region_*/*.h5ad')
+        h5_paths = [(path, path.split('/')[-2][-1]) for path in h5_paths]
+        adatas = []
+        for path, _ in h5_paths:
+            adatas.append(sc.read_h5ad(path))
+        adata = sc.concat(adatas, label='imaging_region', keys=[regnum for _, regnum in h5_paths])
+        
+        return adata
+
+    def seg_set(self, **kwargs):
+        print("Setting segmentor")
+        # TODO: Change this once implementation of CellSegmentation has been updated
+        """Setter for the cell segmentation object for this MerfishExperiment.
+        """
+        self._segmentator_instance = object
+    
+    def img_set(self, **kwargs):
+        print("Setting segmentor")
+        # TODO: Change this once implementation of CellSegmentation has been updated
+        """Setter for the cell segmentation object for this MerfishExperiment.
+        """
+        self._segmentator_instance = object
+
 
 class XeniumExperiment(_AbsMFExperiment):
     # This class mostly exists to access files
