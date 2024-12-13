@@ -7,6 +7,7 @@ from glob import glob
 from .segmentation import CellSegmentation
 from .fileio import ImageDataset, MerfishAnalysis
 from .fileio import _AbsExperimentSchema, MerscopeSchema, SmallMerscopeSchema, XeniumSchema 
+from .scanpy_wrap import MerData
 
 class _AbsMFExperiment(ABC):
     """
@@ -196,8 +197,17 @@ class MerscopeExperiment(_AbsMFExperiment):
     def create_scanpy_object(self):
         from .cellgene import create_scanpy_object
         merscope_ad = MerfishAnalysis(self.files['cellpose'])
-        adata = create_scanpy_object(merscope_ad)
-        return adata
+        a = create_scanpy_object(merscope_ad)
+        merdata = MerData(
+            X=a.X,
+            obs=a.obs,
+            var=a.var,
+            uns=a.uns,
+            obsm=a.obsm,
+            varm=a.varm,
+            layers=a.layers
+            )
+        return merdata
     
 class SmallMerscopeExperiment(_AbsMFExperiment):
 

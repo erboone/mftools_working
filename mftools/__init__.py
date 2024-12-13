@@ -9,3 +9,4 @@ from . import plotting
 from . import segmentation
 from . import stats
 from . import util
+from .scanpy_wrap import MerData
