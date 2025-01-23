@@ -106,10 +106,11 @@ class SmallMerscopeSchema(_AbsExperimentSchema):
             'data': '{root}/{exp}/',
             'output': '{root}/{exp}/',
             'analysis': '{root}/{exp}/',
-            'images': '{root}/{exp}/data/',
+            'images': '{root}/{exp}/images/',
             'settings': '{root}/{exp}/data/settings/',
             'cellpose': '{root}/{exp}/',
             'masks' : '{root}/{exp}/cellpose/masks/',
+            'metadata':'{root}/{exp}/..'
             #'data_org': NotImplemented
         }
 
