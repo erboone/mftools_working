@@ -1,13 +1,19 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
+from glob import glob
+import warnings
+
 import pandas as pd
 import scanpy as sc
-from glob import glob
+import numpy as np
+from scanpy import AnnData
 
 from .segmentation import CellSegmentation
 from .fileio import ImageDataset, MerfishAnalysis
 from .fileio import _AbsExperimentSchema, MerscopeSchema, SmallMerscopeSchema, XeniumSchema 
 from .scanpy_wrap import MerData
+
+warnings.filterwarnings("ignore")
 
 class _AbsMFExperiment(ABC):
     """
@@ -230,25 +236,30 @@ class SmallMerscopeExperiment(_AbsMFExperiment):
                         img_kwargs=img_kwargs)
         
     def create_scanpy_object(self):
-        data = self.files['data']
-        h5_paths = glob(f'{data}/region_*/*.h5ad')
-        h5_paths = [(path, path.split('/')[-2][-1]) for path in h5_paths]
-        adatas = []
-        for path, _ in h5_paths:
-            adatas.append(sc.read_h5ad(path))
-        adata = sc.concat(adatas, label='imaging_region', keys=[regnum for _, regnum in h5_paths])
+        # Load data
+        data_p = self.files['data']
+        cbgt = sc.read_csv(f'{data_p}/cell_by_gene.csv', first_column_names=True)
+        cells = pd.read_csv(f'{data_p}/cell_metadata.csv')
         
+        # Maniplating into raw counts data
+        cbgt.obs = cells
+        drop_cols = ['EntityID', 'anisotropy', 'transcript_count', 'perimeter_area_ratio', 'solidity', 'SPP1_raw', 'SPP1_high_pass', 'TAGLN_raw', 'TAGLN_high_pass', 'SFTPB_raw', 'SFTPB_high_pass', 'Cellbound2_raw', 'Cellbound2_high_pass', 'Cellbound3_raw', 'Cellbound3_high_pass', 'DAPI_raw', 'DAPI_high_pass', 'UMOD_raw', 'UMOD_high_pass', 'PolyT_raw', 'PolyT_high_pass', 'Cellbound1_raw', 'Cellbound1_high_pass', 'ACTA2_raw', 'ACTA2_high_pass', 'OLFM4_raw', 'OLFM4_high_pass']
+        cbgt.obs_names = cbgt.obs['EntityID'].rename('cell').astype('string')
+        cbgt.obs.drop(drop_cols, axis=1, inplace=True, errors='ignore')
+        cbgt = cbgt[:, ~cbgt.var_names.str.contains('Blank-')]
+        cbgt.obsm['X_spatial'] = np.array(cbgt.obs[['center_x','center_y']])
+        adata = cbgt
         return adata
 
     def seg_set(self, **kwargs):
-        print("Setting segmentor")
+        # print("Setting segmentor")
         # TODO: Change this once implementation of CellSegmentation has been updated
         """Setter for the cell segmentation object for this MerfishExperiment.
         """
         self._segmentator_instance = object
     
     def img_set(self, **kwargs):
-        print("Setting segmentor")
+        # print("Setting segmentor")
         # TODO: Change this once implementation of CellSegmentation has been updated
         """Setter for the cell segmentation object for this MerfishExperiment.
         """
@@ -273,7 +284,7 @@ class XeniumExperiment(_AbsMFExperiment):
                           img_kwargs=img_kwargs)
 
     def seg_set(self, **kwargs):
-        print("Setting segmentor")
+        # print("Setting segmentor")
         # TODO: Change this once implementation of CellSegmentation has been updated
         """Setter for the cell segmentation object for this MerfishExperiment.
         """
