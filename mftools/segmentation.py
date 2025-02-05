@@ -55,6 +55,7 @@ def match_cells_in_overlap(strip_a: np.ndarray, strip_b: np.ndarray) -> Set[tupl
     return s1 & s2
 
 
+# TODO: Move this to our MerData class
 def filter_by_volume(celldata, min_volume, max_factor):
     # Remove small cells
     celldata.loc[celldata["volume"] < min_volume, "status"] = "Too small"
