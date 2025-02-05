@@ -39,6 +39,7 @@ class _AbsMFExperiment(ABC):
     def __init__(self, 
             root:str,
             name:str,
+            reg:str=None,
             alt_paths:dict={},
             seg_kwargs:dict={},
             img_kwargs:dict={}
@@ -47,7 +48,8 @@ class _AbsMFExperiment(ABC):
         # setting properties
         self.root = root
         self.name = name
-        self.files = self._schema_class(root, name, schema_mod=alt_paths)
+        self.reg = reg
+        self.files = self._schema_class(root, name, reg, schema_mod=alt_paths)
         self.savepath = Path(self.files['cellpose'])
         # Properties set using @property.setter; see below
         # def namespace
@@ -181,7 +183,7 @@ class _AbsMFExperiment(ABC):
         return self.__load_dataframe("cell_by_gene.csv", add_region=False)
     
     @abstractmethod
-    def create_scanpy_object():
+    def create_scanpy_object(self):
         pass
         
 class MerscopeExperiment(_AbsMFExperiment):
@@ -193,11 +195,12 @@ class MerscopeExperiment(_AbsMFExperiment):
     def __init__(self, 
             root:str,
             name:str,
+            reg:str=None,
             alt_paths:dict={},
             seg_kwargs:dict={},
             img_kwargs:dict={}
         ):
-        super().__init__(root, name, alt_paths=alt_paths, seg_kwargs=seg_kwargs,
+        super().__init__(root, name, reg, alt_paths=alt_paths, seg_kwargs=seg_kwargs,
                           img_kwargs=img_kwargs)
 
     def create_scanpy_object(self):
