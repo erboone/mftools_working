@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from glob import glob
 from pathlib import Path
 from typing import Optional, Dict, Sequence
+import cv2, zipfile
 
 import h5py
 import numpy as np
@@ -30,7 +31,7 @@ class _AbsExperimentSchema(ABC):
         if 'root' not in schema:
             pass 
 
-    def __init__(self, root:str, exp:str, schema_mod:dict={}, fill_mod:dict={}):
+    def __init__(self, root:str, exp:str, reg:str=None, schema_mod:dict={}, fill_mod:dict={}):
         self._schema:dict[str, str] = None
         self._schema = self._default_schema
         for key, val in schema_mod.items():
@@ -38,7 +39,7 @@ class _AbsExperimentSchema(ABC):
         self.root = root
         self.exp = exp
         # TODO: consider making fill private and handeling with getters/setters
-        self.fill = {'exp':exp, 'root':root}
+        self.fill = {'exp':exp, 'root':root, 'reg':reg}
         for key, val in fill_mod.items():
             self.fill[key] = val
 
@@ -87,8 +88,9 @@ class MerscopeSchema(_AbsExperimentSchema):
     def _default_schema(self):
         return {
             'root': '{root}/',
-            'data': '{root}/*data*/{exp}/',
-            'output': '{root}/*output*/{exp}/',
+            'data': '{root}/*data*/{exp}',
+            'output': '{root}/*output*/{exp}',
+            'region': '{root}/*output*/{exp}/{reg}',
             'analysis': '{root}/*analysis*/{exp}/',
             'images': '{root}/*data*/{exp}/data/',
             'settings': '{root}/*data*/{exp}/data/settings/',
@@ -456,6 +458,8 @@ class ImageDataset:
                 self.regex[row["channelName"]] = re.compile(row["imageRegExp"])
         if Path(self.root, "data").is_dir():
             self.filenames = list(Path(self.root, "data").glob("*.dax"))
+        elif Path(self.root, "data-compressed").is_dir():
+            self.filenames = list(Path(self.root, "data-compressed").glob("*.jp2.zip"))
         else:
             self.filenames = list(self.root.glob("*.dax"))
 
@@ -504,15 +508,21 @@ class ImageDataset:
         except IndexError:
             raise IndexError(f"Channel {channel} not found in data organization")
         filename = self.filename(channel, fov)
-        dax = DaxFile(str(filename))
-        if fiducial:
-            return dax.frame(row["fiducialFrame"])
-        if zslice is not None:
-            return dax.frame(row["frame"][zslice])
-        imgstack = np.array([dax.frame(frame) for frame in row["frame"]])
-        if max_projection:
-            return imgstack.max(axis=0)
-        return imgstack
+
+        if filename.suffix == '.dax':
+            dax = DaxFile(str(filename))
+            if fiducial:
+                return dax.frame(row["fiducialFrame"])
+            if zslice is not None:
+                return dax.frame(row["frame"][zslice])
+            imgstack = np.array([dax.frame(frame) for frame in row["frame"]])
+            if max_projection:
+                return imgstack.max(axis=0)
+            return imgstack
+        elif filename.suffix == '.zip':
+            zfjp = Jp2ZipFile(filename)
+            if zslice is not None:
+                return zfjp[zslice]
 
 
 class DaxFile:
@@ -637,3 +647,21 @@ class DaxFile:
         yr = (center[1] - volume[1], center[1] + volume[1])
         xr = (center[2] - volume[2], center[2] + volume[2])
         return self.block_range(zr=zr, yr=yr, xr=xr, channel=channel)
+    
+class Jp2ZipFile:
+    def __init__(self, filepath:str):
+        self._zf = zipfile.ZipFile(filepath)
+        self._ZipInfo = {i:zinfo for i, zinfo in enumerate(self._zf.NameToInfo.values())}
+        self._ZipInfo['inf'] = self._ZipInfo.pop(list(self._ZipInfo.keys())[-1])
+
+    # TODO: Change getitem to actually operate if it takes a zslice
+    def __getitem__(self, key:slice) -> np.ndarray:
+        for k in [key]:
+            self._unzip_img(key)
+        return 
+
+    def _unzip_img(self, key:int):
+        zip_img = self._zf.open(self._ZipInfo[key])
+        cv_img = cv2.imdecode(np.frombuffer(zip_img.read(), dtype=np.uint8),
+                              cv2.IMREAD_UNCHANGED)
+        return cv_img
