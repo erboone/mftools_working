@@ -473,3 +473,34 @@ def fov_show(
 def fov_transcripts():
     pass
     # do this
+
+#added the perameter of highlighttype which is what you want highlighted. When I wrote the function I used fov but if you want to do celltype you can put that as the string in highlighttype
+def embedding_highlight(adata: sc.AnnData, highlight: str | list[int], highlighttype: str, basis: str, colors: list[str], background: str, returntype: str, **kwargs) -> None:
+    s = 120000 / adata.shape[0]
+    basis_coords = adata.obsm[basis]
+    basis_coords_array = np.array(basis_coords)
+    fig, ax = plt.subplots()
+    ax.set_facecolor(background)
+    ax.scatter(basis_coords_array[:, 0], basis_coords_array[:, 1], s=s, c='lightgray', **kwargs)
+
+    if len(highlight) != len(colors) and len(colors) != 1:
+        raise ValueError("Amount of colors must match amount of things to highlight")
+    
+    if len(colors) == 1:
+        updated_colors = []
+        for i in range(len(highlight)):
+            updated_colors.append(colors[0])
+        colors = updated_colors
+        
+    if len(highlight) == len(colors):
+        for i, tohighlight in enumerate(highlight):
+            highlight_mask = adata.obs[highlighttype] == tohighlight
+            ax.scatter(basis_coords[highlight_mask.to_numpy(), 0], basis_coords[highlight_mask.to_numpy(), 1], s=s, c=colors[i], label=f'{highlighttype}:{tohighlight}', **kwargs)
+        plt.legend()
+
+    if returntype == "save":
+        plt.savefig("embedding_highlight.png")
+    if returntype == "show":
+        plt.show()
+    if returntype == "return":
+        return plt
