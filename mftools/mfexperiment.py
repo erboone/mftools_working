@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from glob import glob
 import warnings
+import json
 
 import pandas as pd
 import scanpy as sc
@@ -12,6 +13,7 @@ from .segmentation import CellSegmentation
 from .fileio import ImageDataset, MerfishAnalysis
 from .fileio import _AbsExperimentSchema, MerscopeSchema, SmallMerscopeSchema, XeniumSchema 
 from .scanpy_wrap import MerData
+from .stats import stats
 
 warnings.filterwarnings("ignore")
 
@@ -93,7 +95,7 @@ class _AbsMFExperiment(ABC):
         else:    
             self._segmentator_instance = self._segmentator_class(
                 mask_folder = self.files['masks'],
-                output = MerfishAnalysis(self.files['output']),
+                output = MerfishAnalysis(self.files['cellpose']),
                 imagedata=self.imgs,
                 **kwargs
             )
@@ -182,6 +184,39 @@ class _AbsMFExperiment(ABC):
     def load_cell_by_gene_table(self) -> pd.DataFrame:
         return self.__load_dataframe("cell_by_gene.csv", add_region=False)
     
+    def assign_to_cells(self, barcodes, masks, drifts=None, transpose=False, flip_x=True, flip_y=True):
+        for fov in tqdm(np.unique(barcodes["fov"]), desc="Assigning barcodes to cells"):
+            group = barcodes.loc[barcodes["fov"] == fov]
+            if drifts is not None:
+                xdrift = drifts.loc[fov]["X drift"]
+                ydrift = drifts.loc[fov]["Y drift"]
+            else:
+                xdrift, ydrift = 0, 0
+            x = (group["x"] + xdrift).round() // config.get("scale")
+            y = (group["y"] + ydrift).round() // config.get("scale")
+            if flip_x:
+                x = 2048 - x
+            if flip_y:
+                y = 2048 - y
+            if transpose:
+                x, y = y, x
+            x = x.clip(upper=2047).astype(int)
+            y = y.clip(upper=2047).astype(int)
+            if len(masks[fov].shape) == 3:
+                # TODO: Remove hard-coding of scale
+                z = (group["z"].round() / 6.333333).astype(int)
+                barcodes.loc[barcodes["fov"] == fov, "cell_id"] = masks[fov][z, x, y] + 10000 * fov
+            else:
+                barcodes.loc[barcodes["fov"] == fov, "cell_id"] = masks[fov][x, y] + 10000 * fov
+        barcodes.loc[barcodes["cell_id"] % 10000 == 0, "cell_id"] = 0
+        barcodes["cell_id"] = barcodes["cell_id"].astype(int)
+        stats.set("Barcodes assigned to cells", len(barcodes[barcodes["cell_id"] != 0]))
+        stats.set(
+            "% barcodes assigned to cells",
+            stats.get("Barcodes assigned to cells") / len(barcodes),
+        )
+        return barcodes
+    
     @abstractmethod
     def create_scanpy_object(self):
         pass
@@ -202,21 +237,78 @@ class MerscopeExperiment(_AbsMFExperiment):
         ):
         super().__init__(root, name, reg, alt_paths=alt_paths, seg_kwargs=seg_kwargs,
                           img_kwargs=img_kwargs)
+        try:
+            with open(Path(self.files['settings']) / 'microscope_parameters.json', 'r') as file:
+                self.settings = json.load(file)
+        except FileNotFoundError:
+                self.settings = {'image_dimensions': (204, 204)}
 
-    def create_scanpy_object(self):
-        from .cellgene import create_scanpy_object
-        merscope_ad = MerfishAnalysis(self.files['cellpose'])
-        a = create_scanpy_object(merscope_ad)
-        merdata = MerData(
-            X=a.X,
-            obs=a.obs,
-            var=a.var,
-            uns=a.uns,
-            obsm=a.obsm,
-            varm=a.varm,
-            layers=a.layers
+    def create_scanpy_object(self, name=None, positions=None, codebook=None, keep_empty_cells=True, return_adata=False):
+        from .cellgene import adjust_spatial_coordinates
+        merscope_ana = MerfishAnalysis(self.files['cellpose'])
+        
+        cellgene = merscope_ana.load_cell_by_gene_table()
+        celldata = merscope_ana.load_cell_metadata()
+        cellgene.index = cellgene.index.astype(str)
+        celldata.index = celldata.index.astype(str)
+        if keep_empty_cells:
+            empty_cells = pd.DataFrame(
+                [
+                    pd.Series(data=0, index=cellgene.columns, name=cellid)
+                    for cellid in celldata.index.difference(cellgene.index)
+                ]
             )
-        return merdata
+            cellgene = pd.concat([cellgene, empty_cells])
+        blank_cols = np.array(["notarget" in col or "blank" in col.lower() for col in cellgene])
+        adata = sc.AnnData(cellgene.loc[:, ~blank_cols], dtype=np.int32)
+        adata.obsm["X_blanks"] = cellgene.loc[:, blank_cols].to_numpy()
+        adata.uns["blank_names"] = list(blank_cols)
+        if "global_x" in celldata:
+            adata.obsm["X_spatial"] = np.array(
+                celldata[["global_x", "global_y"]].reindex(index=adata.obs.index)
+            )
+        elif "center_x" in celldata:
+            adata.obsm["X_spatial"] = np.array(
+                celldata[["center_x", "center_y"]].reindex(index=adata.obs.index)
+            )
+        if "fov_x" in celldata:
+            adata.obsm["X_local"] = np.array(celldata[["fov_x", "fov_y"]].reindex(index=adata.obs.index))
+        for column in celldata.columns:
+            adata.obs[column] = celldata[column]
+        adata.obs["fov"] = adata.obs["fov"].astype(str)
+        adata.layers["counts"] = adata.X
+        sc.pp.calculate_qc_metrics(adata, percent_top=None, inplace=True)
+        adata.obs["blank_counts"] = adata.obsm["X_blanks"].sum(axis=1)
+        adata.obs["misid_rate"] = (adata.obs["blank_counts"] / len(adata.uns["blank_names"])) / (
+            adata.obs["total_counts"] / len(adata.var_names)
+        )
+        adata.obs["counts_per_volume"] = adata.obs["total_counts"] / adata.obs["volume"]
+        if codebook:
+            adata.varm["codebook"] = codebook.set_index("name").loc[adata.var_names].filter(like="bit").to_numpy()
+            for bit in range(adata.varm["codebook"].shape[1]):
+                adata.obs[f"bit{bit+1}"] = adata[:, adata.varm["codebook"][:, bit] == 1].X.sum(axis=1)
+        if positions:
+            adata.uns["fov_positions"] = positions.to_numpy()
+        if name:
+            adata.uns["dataset_name"] = name
+        else:
+            adata.uns["dataset_name"] = merscope_ana.root.name
+
+        adjust_spatial_coordinates(adata, flip_horizontal=True)
+
+        if not return_adata:
+            merdata = MerData(
+                X=adata.X,
+                obs=adata.obs,
+                var=adata.var,
+                uns=adata.uns,
+                obsm=adata.obsm,
+                varm=adata.varm,
+                layers=adata.layers
+                )
+            return merdata
+        else:
+            return adata
     
 class SmallMerscopeExperiment(_AbsMFExperiment):
 

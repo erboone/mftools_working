@@ -13,7 +13,8 @@ import pandas as pd
 
 from . import stats
 
-
+# TODO: this has been copyed and edited into the MerscopeExperiment create_scanpy_object()
+# TODO: as such this whole thing needs to be reviewed to make
 def create_scanpy_object(analysis, name=None, positions=None, codebook=None, keep_empty_cells=True) -> sc.AnnData:
     cellgene = analysis.load_cell_by_gene_table()
     celldata = analysis.load_cell_metadata()

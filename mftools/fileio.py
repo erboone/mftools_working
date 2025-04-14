@@ -93,7 +93,7 @@ class MerscopeSchema(_AbsExperimentSchema):
             'region': '{root}/*output*/{exp}/{reg}',
             'analysis': '{root}/*analysis*/{exp}/',
             'images': '{root}/*data*/{exp}/data/',
-            'settings': '{root}/*data*/{exp}/data/settings/',
+            'settings': '{root}/*data*/{exp}/settings/',
             'cellpose': '{root}/*output*/{exp}/cellpose/',
             'masks' : '{root}/*output*/{exp}/cellpose/masks/',
             #'data_org': NotImplemented
@@ -148,6 +148,7 @@ def search_for_mask_file(segmask_dir: Path, fov: int) -> Path:
     Raises:
         FileNotFoundError: If no mask file could be found.
     """
+    # TODO: These patterns will not work if there are more than 1000 fovs
     patterns = [
         # Bogdan's segmentation script
         f"Fov-0*{fov}_seg.pkl",
@@ -155,6 +156,7 @@ def search_for_mask_file(segmask_dir: Path, fov: int) -> Path:
         # We prefer the npy file so we don't need the PIL library
         f"Conv_zscan_H0_F_0*{fov}_seg.npy",  # Homebuilt microscope filenames
         f"stack_prestain_0*{fov}_seg.npy",  # MERSCOPE filenames
+        f"stack_prestain_0*{fov}.jp2_seg.npy",  # MERSCOPE Ultra filenames
         # Try the png cellpose output if the numpy files aren't there
         f"stack_prestain_0*{fov}_cp_masks.png",
         f"Conv_zscan_H0_F_0*{fov}_cp_masks.png",
@@ -493,7 +495,7 @@ class ImageDataset:
         return Path(self.root / "settings/positions.csv").exists()
 
     def load_image(
-        self, fov: int, zslice: int = None, channel: str = None, max_projection: bool = False, fiducial: bool = False
+        self, fov: int, zslice: int = None, channel:list[str] = None, max_projection: bool = False, fiducial: bool = False
     ) -> np.ndarray:
         """Load an image from the dataset.
 
@@ -503,27 +505,41 @@ class ImageDataset:
         a 2D max projection along the z-axis is returned, depending on the
         max_projection parameter.
         """
-        try:
-            row = self.data_organization[self.data_organization["channelName"] == channel].iloc[0]  # Assume 1 match
-        except IndexError:
-            raise IndexError(f"Channel {channel} not found in data organization")
-        filename = self.filename(channel, fov)
+        stack = []
+        for chan in channel:
+            try:
+                row = self.data_organization[self.data_organization["channelName"] == chan].iloc[0]  # Assume 1 match
+            except IndexError:
+                raise IndexError(f"Channel {chan} not found in data organization")
+            filename = self.filename(chan, fov)
 
-        if filename.suffix == '.dax':
-            dax = DaxFile(str(filename))
-            if fiducial:
-                return dax.frame(row["fiducialFrame"])
-            if zslice is not None:
-                return dax.frame(row["frame"][zslice])
-            imgstack = np.array([dax.frame(frame) for frame in row["frame"]])
-            if max_projection:
-                return imgstack.max(axis=0)
-            return imgstack
-        elif filename.suffix == '.zip':
-            zfjp = Jp2ZipFile(filename)
-            if zslice is not None:
-                return zfjp[zslice]
+            if filename.suffix == '.dax':
+                dax = DaxFile(str(filename))
+                if fiducial:
+                    return dax.frame(row["fiducialFrame"])
+                if zslice is not None:
+                    return dax.frame(row["frame"][zslice])
+                img = np.array([dax.frame(frame) for frame in row["frame"]])
+                if max_projection:
+                    return img.max(axis=0)
+                
+            elif filename.suffix == '.zip':
+                
+                # zslice = zslice(frames[0], frames[-1]+1)
+                zfjp = Jp2ZipFile(filename)
+                if zslice is not None:
+                    frame = row['frame'][zslice]
+                    img = zfjp[frame]
+                else:
+                    frame = slice(row['frame'][0], row['frame'][-1])
+                    img = zfjp[frame]
+                
+                if max_projection:
+                    stack.append(np.dstack(img.max(axis=0)))
+                else:
+                    stack.append(img)
 
+        return np.vstack(stack)
 
 class DaxFile:
     """Loads data from a DAX image file."""
@@ -651,16 +667,23 @@ class DaxFile:
 class Jp2ZipFile:
     def __init__(self, filepath:str):
         self._zf = zipfile.ZipFile(filepath)
-        self._ZipInfo = {i:zinfo for i, zinfo in enumerate(self._zf.NameToInfo.values())}
+        self._ZipInfo = self._zf.NameToInfo
+        self._ZipInfoList = list(self._ZipInfo.items())
         self._ZipInfo['inf'] = self._ZipInfo.pop(list(self._ZipInfo.keys())[-1])
 
     # TODO: Change getitem to actually operate if it takes a zslice
-    def __getitem__(self, key:slice) -> np.ndarray:
-        for k in [key]:
-            self._unzip_img(key)
-        return 
+    def __getitem__(self, keys:slice | int) -> np.ndarray:
+        arrs = []
+        if isinstance(keys, slice) and keys.stop is None: 
+            keys = slice(keys.start, len(self._ZipInfo) - 1, keys.step)
+        tups = self._ZipInfoList[keys]
+        if not isinstance(tups, list):
+            tups = [tups]
+        for k, _ in tups:
+            arrs.append(self._unzip_img(k))
+        return np.stack(arrs)
 
-    def _unzip_img(self, key:int):
+    def _unzip_img(self, key:int) -> np.ndarray:
         zip_img = self._zf.open(self._ZipInfo[key])
         cv_img = cv2.imdecode(np.frombuffer(zip_img.read(), dtype=np.uint8),
                               cv2.IMREAD_UNCHANGED)
