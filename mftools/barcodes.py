@@ -163,7 +163,7 @@ def make_table(merlin_result: fileio.MerlinOutput, codebook: pd.DataFrame) -> pd
     return df
 
 
-def calculate_global_coordinates(barcodes: pd.DataFrame, positions: pd.DataFrame) -> None:
+def calculate_global_coordinates(barcodes: pd.DataFrame, positions: pd.DataFrame, imgsize:int, pix_t_mic:int) -> None:
     """Add global_x and global_y columns to barcodes."""
 
     def convert_to_global(group: pd.DataFrame) -> pd.DataFrame:
@@ -171,14 +171,13 @@ def calculate_global_coordinates(barcodes: pd.DataFrame, positions: pd.DataFrame
         fov = int(group.iloc[0]["fov"])
         ypos = positions.loc[fov][0]
         xpos = positions.loc[fov][1]
-        group["global_y"] = 220 * (2048 - group["y"]) / 2048 + ypos
-        group["global_x"] = 220 * group["x"] / 2048 + xpos
+        group["global_y"] = pix_t_mic * (imgsize - group["y"]) / imgsize + ypos
+        group["global_x"] = pix_t_mic * group["x"] / imgsize + xpos
         return group[["global_x", "global_y"]]
 
     barcodes[["global_x", "global_y"]] = barcodes.groupby("fov", group_keys=False).apply(convert_to_global)
 
-
-def assign_to_cells(barcodes, masks, drifts=None, transpose=False, flip_x=True, flip_y=True):
+def assign_to_cells(barcodes, masks, imgsize, drifts=None, transpose=False, flip_x=True, flip_y=True):
     for fov in tqdm(np.unique(barcodes["fov"]), desc="Assigning barcodes to cells"):
         group = barcodes.loc[barcodes["fov"] == fov]
         if drifts is not None:
@@ -189,13 +188,13 @@ def assign_to_cells(barcodes, masks, drifts=None, transpose=False, flip_x=True, 
         x = (group["x"] + xdrift).round() // config.get("scale")
         y = (group["y"] + ydrift).round() // config.get("scale")
         if flip_x:
-            x = 2048 - x
+            x = imgsize - x
         if flip_y:
-            y = 2048 - y
+            y = imgsize - y
         if transpose:
             x, y = y, x
-        x = x.clip(upper=2047).astype(int)
-        y = y.clip(upper=2047).astype(int)
+        x = x.clip(upper=(imgsize-1)).astype(int)
+        y = y.clip(upper=(imgsize-1)).astype(int)
         if len(masks[fov].shape) == 3:
             # TODO: Remove hard-coding of scale
             z = (group["z"].round() / 6.333333).astype(int)
@@ -209,14 +208,14 @@ def assign_to_cells(barcodes, masks, drifts=None, transpose=False, flip_x=True, 
         "% barcodes assigned to cells",
         stats.get("Barcodes assigned to cells") / len(barcodes),
     )
-
+    return barcodes
 
 def link_cell_ids(barcodes, cell_links):
     link_map = {cell: list(group)[0] for group in cell_links for cell in group}
     barcodes["cell_id"] = barcodes["cell_id"].apply(lambda cid: link_map[cid] if cid in link_map else cid)
 
 
-def trim_barcodes_in_overlaps(barcodes, trim_overlaps):
+def trim_barcodes_in_overlaps(barcodes, trim_overlaps, imgsize):
     xstarts = defaultdict(list)
     xstops = defaultdict(list)
     ystarts = defaultdict(list)
@@ -226,11 +225,11 @@ def trim_barcodes_in_overlaps(barcodes, trim_overlaps):
             if overlap.xslice.start:
                 xstarts[overlap.xslice.start].append(overlap.fov)
             if overlap.xslice.stop:
-                xstops[2048 // config.get("scale") + overlap.xslice.stop].append(overlap.fov)
+                xstops[imgsize // config.get("scale") + overlap.xslice.stop].append(overlap.fov)
             if overlap.yslice.start:
                 ystarts[overlap.yslice.start].append(overlap.fov)
             if overlap.yslice.stop:
-                ystops[2048 // config.get("scale") + overlap.yslice.stop].append(overlap.fov)
+                ystops[imgsize // config.get("scale") + overlap.yslice.stop].append(overlap.fov)
     for xstart, fovs in xstarts.items():
         barcodes = barcodes[(~barcodes["fov"].isin(fovs)) | (barcodes["x"] // config.get("scale") <= xstart)]
     for ystart, fovs in ystarts.items():
