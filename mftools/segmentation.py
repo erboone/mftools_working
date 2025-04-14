@@ -84,7 +84,7 @@ class CellSegmentation:
         output: fileio.MerfishAnalysis = None,
         positions: pd.DataFrame = None,
         imagedata: fileio.ImageDataset = None,
-        channel: str = "PolyT",
+        channel: str | list[str] = "PolyT",
         zslice: int = None,
         model_path:Path=None
     ) -> None:
@@ -103,13 +103,16 @@ class CellSegmentation:
         if positions is not None:
             self.positions = images.FOVPositions(positions=positions)
         self.imagedata = imagedata
-        self.channel = channel
+        if isinstance(channel, list):
+            self.channel = channel
+        else:
+            self.channel = list(channel)
         self.zslice = zslice
         if imagedata is not None:
             if model_path is not None:
                 self.model = cpmodels.CellposeModel(gpu=True, pretrained_model=model_path)
             else:
-                self.model = cpmodels.Cellpose(gpu=True, model_type="cyto2")
+                self.model = cpmodels.Cellpose(gpu=True, model_type="cyto3")
             if not self.positions and imagedata.has_positions():
                 self.positions = images.FOVPositions(positions=imagedata.load_fov_positions())
         self.masks = {}
@@ -131,8 +134,10 @@ class CellSegmentation:
                 self.masks[key] = fileio.load_mask(self.path, key)
             except (FileNotFoundError, AttributeError):
                 mask = self.segment_fov(key)
+                #TODO: Figure out why the ultra segmentation is producing 3D masks
+                if mask.shape[0] == 1: mask = mask[0]
                 if self.path:
-                    filename = self.path / self.imagedata.filename(self.channel, key).stem
+                    filename = self.path / self.imagedata.filename(self.channel[0], key).stem
                     fileio.save_mask(Path(str(filename) + "_seg.npy"), mask)
                 self.masks[key] = mask
                 return mask
@@ -173,6 +178,7 @@ class CellSegmentation:
             table["global_x"], table["global_y"] = self.positions.local_to_global_coordinates(
                 table["fov_x"], table["fov_y"], table["fov"]
             )
+            # TODO: This usualy returns NaN
             table["overlap_volume"] = self.get_overlap_volume()
             self.__add_linked_volume(table)
             table = table.drop(
@@ -184,8 +190,11 @@ class CellSegmentation:
                 ],
                 axis=1,
             )
-            duplicates = np.concatenate([list(group)[1:] for group in self.linked_cells])
-            table = table.drop(duplicates, axis=0)
+
+            linked_cell_lists = [list(group)[1:] for group in self.linked_cells]
+            if linked_cell_lists:
+                duplicates = np.concatenate(linked_cell_lists)
+                table = table.drop(duplicates, axis=0)
         if self.output is not None:
             self.output.save_cell_metadata(table)
         return table
@@ -234,8 +243,11 @@ class CellSegmentation:
             linked_sets = new
         return linked_sets
 
-    def segment_fov(self, fov: int):
+    def segment_fov(self, fov:int):
         segim = self.imagedata.load_image(fov=fov, channel=self.channel, zslice=self.zslice)
+        if segim.shape[0] == 1:
+            segim = segim[0]
+
         if segim.ndim == 2:
             seg_out = self.model.eval(
                 segim,
@@ -248,10 +260,25 @@ class CellSegmentation:
             mask = remove_small_cells_from_mask(mask, min_volume=2500)
             mask = expand_labels(mask, 3)
         elif segim.ndim == 3:
-            frames, _, _, _ = self.model.eval(
-                list(segim), diameter=80, channels=[0, 0], cellprob_threshold=-4, flow_threshold=1.25
+            
+                
+            
+            # Checks the order of the channels requested; if either PolyT or DAPI are not present, 
+            # sum and segment as grayscale
+            try:
+                channel_keys = [self.channel.index('PolyT'), self.channel.index('DAPI')]
+            except ValueError:
+                segim = segim.sum(axis=0)
+                channel_keys = [0,0]
+            
+            segim = [segim]
+            seg_out = self.model.eval(
+                segim, diameter=80, channels=channel_keys, cellprob_threshold=-4, flow_threshold=1.25
             )
+
+            frames = seg_out[0]
             mask = np.array(cputils.stitch3D(frames))
+
             mask = remove_small_cells_from_mask(mask, min_volume=2500)
             for i, frame in enumerate(mask):
                 mask[i] = expand_labels(frame, 3)
@@ -283,6 +310,7 @@ class CellSegmentation:
         table["fov_cell_id"] = table["fov_cell_id"].astype(int)
         table["fov_volume"] = table["fov_volume"].astype(int)
         table = table.set_index("cell_id")
+        # TODO: Not sure what this does; figure out
         table["fov_x"] *= config.get("scale")
         table["fov_y"] *= config.get("scale")
         stats.set("Segmented cells", len(table))
