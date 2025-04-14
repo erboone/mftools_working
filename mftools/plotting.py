@@ -436,7 +436,7 @@ def fov_show(
         plot_centroids:bool=False,
         plot_transcripts:bool=False
     ) -> None | Axes: 
-    
+
     # Init figure
     if ax is None:
         fig, ax = plt.subplots(1, 1)
@@ -444,9 +444,16 @@ def fov_show(
     #plt.figure(dpi=150)
 
     mask = seg[fov]
+    if mask.ndim > 2:
+        mask = mask.sum(axis=0)
+        # print(mask)
+
 
     if plot_channel:
-        channel = imgs.load_image(channel=seg.channel, fov=fov, max_projection=True)
+        channel = imgs.load_image(channel=seg.channel, zslice=3, fov=fov, max_projection=False)
+        # print(channel.shape)
+        if channel.ndim > 2:
+            channel = channel.mean(axis=0)
         plt.imshow(channel, cmap="gray")
     
     if plot_mask: 
@@ -459,9 +466,9 @@ def fov_show(
     if plot_transcripts:
         barcodes = output.load_barcode_table()
         incells = barcodes[(barcodes['fov'] == fov) & (barcodes['cell_id'] != 0)]
-        plt.scatter(incells['x'], incells['y'], s=.3)
+        plt.scatter(incells['x'], incells['y'], s=.2)
         outcells = barcodes[(barcodes['fov'] == fov) & (barcodes['cell_id'] == 0)]
-        plt.scatter(outcells['x'], outcells['y'], s=.3)
+        plt.scatter(outcells['x'], outcells['y'], s=.2)
 
     plt.axis("off")
 
