@@ -511,3 +511,71 @@ def embedding_highlight(adata: sc.AnnData, highlight: str | list[int], highlight
         plt.show()
     if returntype == "return":
         return plt
+    
+
+def celltype_corr(mer_adata, ref_adata, lineage_order=None):
+
+    mer_adata = mer_adata.copy()
+    mer_adata.X = mer_adata.layers['counts']
+
+    if lineage_order:
+        celltypes = lineage_order
+    else:
+        celltypes = mer_adata.obs[CELLTYPE_KEY].dropna().unique()
+    sizes = {}
+    mer_counts = {}
+    ref_counts = {}
+
+    common = mer_adata.var_names.intersection(ref_adata.var_names)
+    temp_ref_adata = ref_adata[:, common]
+    temp_mer_adata = mer_adata[:, common]
+
+    for ct in celltypes:
+        if not pd.notna(ct):
+            continue
+        mer_subdata = temp_mer_adata[temp_mer_adata.obs[CELLTYPE_KEY] == ct]
+        ref_subdata = temp_ref_adata[temp_ref_adata.obs[CELLTYPE_KEY] == ct]
+        sizes[ct] = mer_subdata.shape[0]
+        common = mer_subdata.var_names.intersection(ref_subdata.var_names)
+
+        if mer_subdata.shape[0] < 1 or ref_subdata.shape[0] < 1:
+            continue
+        mer_counts[ct] = np.array(mer_subdata.X.mean(axis=0)).flatten()
+        ref_counts[ct] = np.array(ref_subdata.X.mean(axis=0)).flatten()
+
+    print(celltypes)
+    print(mer_subdata.shape)
+    print(ref_subdata.shape)
+    print(mer_counts.keys())
+    print(ref_counts.keys())
+    print(mer_counts)
+    print(ref_counts)
+    result = []
+    for ct1 in mer_counts.keys():
+        row = []
+        for ct2 in ref_counts.keys():
+            row.append(
+                pearsonr(
+                    np.nan_to_num(np.log(mer_counts[ct1]+0.0001)), 
+                    np.nan_to_num(np.log(ref_counts[ct2]+0.00001))
+            )[0])
+        result.append(row)
+
+    print(result)
+    labels = [f"{ct} ({sizes[ct]:,d} cells)" for ct in mer_counts.keys()] 
+    result = pd.DataFrame(result, index=mer_counts.keys(), columns=ref_counts.keys())
+
+    import seaborn as sns
+    import matplotlib
+    import matplotlib.pyplot as plt
+
+    #medians = [np.median(data[d1].X.sum(axis=1)) for d1 in data]
+    #cmap = matplotlib.cm.get_cmap('viridis')
+    #norm = matplotlib.colors.Normalize(vmin=min(medians), vmax=sorted(medians)[-2])
+    fig = sns.clustermap(result, 
+                cmap="coolwarm", row_cluster=False, col_cluster=False, 
+                dendrogram_ratio=(0, 0.1), cbar_pos=(1, 0.15, .03, .7),
+                vmin=.2, vmax=.6,
+                annot=False, fmt=".2f", cbar_kws={"label": "Correlation of transcripts per gene"}, 
+                figsize=(15, 15), annot_kws={"size": 14, "weight": "bold"})# col_colors=[cmap(norm(med)) for med in medians], 
+    return fig
