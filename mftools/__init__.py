@@ -1,6 +1,6 @@
 """MERFISH analysis in Python."""
 
-from . import barcodes
+from . import barcodes as bar
 from . import cellgene
 from . import config
 from . import fileio

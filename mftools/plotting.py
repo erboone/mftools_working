@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scanpy as sc
+import anndata as an
 from scipy.stats import zscore, pearsonr
 from matplotlib.ticker import FuncFormatter
 from matplotlib.axes import Axes
@@ -513,16 +514,22 @@ def embedding_highlight(adata: sc.AnnData, highlight: str | list[int], highlight
         return plt
     
 
-def celltype_corr(mer_adata, ref_adata, lineage_order=None):
+def celltype_corr(mer_adata, ref_adata, ctkey, lineage_order=None):
+
+    try:
+        mer_ctkey, ref_ctkey = ctkey
+    except ValueError:
+        mer_ctkey, ref_ctkey = (ctkey, ctkey) 
 
     mer_adata = mer_adata.copy()
-    mer_adata.X = mer_adata.layers['counts']
+    # mer_adata.X = mer_adata
+    dend = sc.tl.dendrogram(mer_adata, groupby='_CELLTYPE', inplace=False)
+    print(dend)
 
     if lineage_order:
         celltypes = lineage_order
     else:
-        celltypes = mer_adata.obs[CELLTYPE_KEY].dropna().unique()
-    sizes = {}
+        celltypes = dend["categories_ordered"]
     mer_counts = {}
     ref_counts = {}
 
@@ -533,36 +540,28 @@ def celltype_corr(mer_adata, ref_adata, lineage_order=None):
     for ct in celltypes:
         if not pd.notna(ct):
             continue
-        mer_subdata = temp_mer_adata[temp_mer_adata.obs[CELLTYPE_KEY] == ct]
-        ref_subdata = temp_ref_adata[temp_ref_adata.obs[CELLTYPE_KEY] == ct]
-        sizes[ct] = mer_subdata.shape[0]
-        common = mer_subdata.var_names.intersection(ref_subdata.var_names)
+        mer_subdata = temp_mer_adata[temp_mer_adata.obs[mer_ctkey] == ct]
+        ref_subdata = temp_ref_adata[temp_ref_adata.obs[ref_ctkey] == ct]
 
+        print(mer_subdata.shape[0] < 100, ref_subdata.shape[0] < 100)
         if mer_subdata.shape[0] < 1 or ref_subdata.shape[0] < 1:
             continue
         mer_counts[ct] = np.array(mer_subdata.X.mean(axis=0)).flatten()
         ref_counts[ct] = np.array(ref_subdata.X.mean(axis=0)).flatten()
 
-    print(celltypes)
-    print(mer_subdata.shape)
-    print(ref_subdata.shape)
-    print(mer_counts.keys())
-    print(ref_counts.keys())
-    print(mer_counts)
-    print(ref_counts)
+
     result = []
     for ct1 in mer_counts.keys():
         row = []
         for ct2 in ref_counts.keys():
             row.append(
                 pearsonr(
-                    np.nan_to_num(np.log(mer_counts[ct1]+0.0001)), 
-                    np.nan_to_num(np.log(ref_counts[ct2]+0.00001))
+                    np.nan_to_num(mer_counts[ct1]), 
+                    np.nan_to_num(ref_counts[ct2])
             )[0])
         result.append(row)
 
     print(result)
-    labels = [f"{ct} ({sizes[ct]:,d} cells)" for ct in mer_counts.keys()] 
     result = pd.DataFrame(result, index=mer_counts.keys(), columns=ref_counts.keys())
 
     import seaborn as sns
@@ -572,10 +571,110 @@ def celltype_corr(mer_adata, ref_adata, lineage_order=None):
     #medians = [np.median(data[d1].X.sum(axis=1)) for d1 in data]
     #cmap = matplotlib.cm.get_cmap('viridis')
     #norm = matplotlib.colors.Normalize(vmin=min(medians), vmax=sorted(medians)[-2])
-    fig = sns.clustermap(result, 
-                cmap="coolwarm", row_cluster=False, col_cluster=False, 
-                dendrogram_ratio=(0, 0.1), cbar_pos=(1, 0.15, .03, .7),
-                vmin=.2, vmax=.6,
-                annot=False, fmt=".2f", cbar_kws={"label": "Correlation of transcripts per gene"}, 
-                figsize=(15, 15), annot_kws={"size": 14, "weight": "bold"})# col_colors=[cmap(norm(med)) for med in medians], 
+   
+
+    fig = sns.heatmap(result, 
+                cmap="coolwarm",# row_cluster=False, col_cluster=False, 
+                # order=dend.keys(),
+                #dendrogram_ratio=(0, 0.1), cbar_pos=(1, 0.15, .03, .7),
+                vmin=-1, vmax=1,
+                annot=False, fmt=".2f", cbar_kws={"label": "Correlation of transcripts per gene"}, annot_kws={"size": 14, "weight": "bold"})# col_colors=[cmap(norm(med)) for med in medians], 
+    plt.xticks(size='x-small')
+    plt.xticks(size='x-small')
     return fig
+    
+def _plot_correlation(data1:pd.Series, data2:pd.Series, ax1:str, ax2:str, highlight, logscale:bool=False):
+    from scipy.stats import zscore
+    plt.style.use('default')
+
+    common = data1.index.intersection(data2.index)
+
+    sub_data1 = data1[common]
+    sub_data2 = data2[common]
+    subdf = pd.DataFrame({'x':sub_data1 , 'y':sub_data2})
+
+    # print(len(sub_data1), len(sub_data2))
+    from scipy.stats import pearsonr
+    cmap = {True: 'tab:red', False: 'tab:blue'}
+    map_gene = lambda x: cmap[x in highlight]
+    colors = [map_gene(label) for label in common]
+    plt.scatter(sub_data1, sub_data2, alpha=0.7, c=colors)
+
+    ### Regression line:
+    slope, intercept = np.polyfit(sub_data1, sub_data2, 1)
+    
+    # Identify points of interest
+    squerr = lambda df: (df['y'] -  (slope * df['x']) + intercept)**2
+    mean_squerr = subdf.apply(lambda x: squerr(x), axis=1)
+    outli1 = pd.Series(
+        zscore(mean_squerr) >= 1.8,
+        index=sub_data1.index
+    )
+    outli2 = pd.Series(
+        (zscore(sub_data1) > 3) | (zscore(sub_data1) > 3),
+        index=sub_data1.index
+    )
+    outliers = sub_data1[outli1 | outli2]
+
+
+    correlation_coefficient, _ = pearsonr(sub_data1.values, sub_data2.values)
+
+    plt.title(f'Pearson Correlation: {correlation_coefficient:.2f}   genes: {len(sub_data1)}')
+    plt.xlabel(f'{ax1}')
+    plt.ylabel(f'{ax2}')
+    # plt.legend()
+    ax = plt.gcf().gca()
+    for gene in highlight: # list(outliers.index) + 
+        ax.annotate(str(gene), (sub_data1[gene], sub_data2[gene]), size=8)
+    if logscale:
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+    else: 
+        plt.plot(sub_data1, slope * sub_data1 + intercept, color='red', linestyle=':', label='Regression Line')
+    # plt.savefig(f"plotdump/regression_plots/{ax1}_v_{ax2}.png")
+    return correlation_coefficient, plt.gcf()    
+
+
+# def AnnDataCorrelation(adata1:an, adata2:an, ax1:str, ax2:str, highlight):
+#     common_genes = adata1.var_names.intersection(adata2.var_names)
+#     adata1 = adata1[:, common_genes].copy()
+#     adata2 = adata2[:, common_genes].copy()
+#     adata_list = [adata1, adata2]
+#     mean_list = []
+#     for ad in adata_list:
+#         if isinstance(ad.X, np.ndarray):
+#             mean_list.append(ad.X.mean(axis=0))
+#         else:
+#             mean_list.append(ad.X.toarray().mean(axis=0))
+
+#     plot_correlation(mean_list[0], mean_list[1], ax1, ax2)
+
+def _AnnDataMeanExp(adata:an) -> pd.Series:
+    mean = None
+    if isinstance(adata.X, np.ndarray):
+        mean = pd.Series(adata.X.mean(axis=0))
+    else:
+        mean = pd.Series(adata.X.toarray().mean(axis=0))
+
+    mean.index = adata.var_names
+    return mean
+
+
+def Correlation(data1, data2, ax1:str, ax2:str, highlight, normalize_adata=True, log=False, logscale=False):
+    proc_datas = []
+    for dat in [data1, data2]:
+        temp = dat.copy()
+        if isinstance(dat, sc.AnnData):
+            if normalize_adata:
+                sc.pp.normalize_total(temp, target_sum=1e6, inplace=True)
+                temp.X / 1e7
+            temp = _AnnDataMeanExp(temp)
+        # if temp.max() < 100:
+        #     warn('make sure that data is non-normalized counts')
+        if log:
+            temp = temp.apply(np.log1p)
+        proc_datas.append(temp)
+    
+    proc_data1, proc_data2 = proc_datas
+    return _plot_correlation(proc_data1, proc_data2, ax1, ax2, highlight, logscale)
+

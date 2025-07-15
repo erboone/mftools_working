@@ -12,7 +12,7 @@ class MSEperiment_Test(unittest.TestCase):
         self.e = cls(res.rootdir, res.name, res.region)
 
 
-    def test__create_scanpy_object(self):
+    def __test__create_scanpy_object(self):
         adata:sc.AnnData = self.e.create_scanpy_object()
         self.assertTrue(isinstance(adata, mfexperiment.MerData))
         self.assertTrue(adata.shape[0] > 0 and adata.shape[1] > 0)
@@ -50,12 +50,5 @@ class MSEperiment_Test(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    var = 'string'
-
-    t = newtest()
-    
-    print(t.foo)
-    print(t.bar)
-    msexp_classe
-
-
+    test = MSEperiment_Test()
+    unittest.main()

@@ -112,7 +112,7 @@ class CellSegmentation:
             if model_path is not None:
                 self.model = cpmodels.CellposeModel(gpu=True, pretrained_model=model_path)
             else:
-                self.model = cpmodels.Cellpose(gpu=True, model_type="cyto3")
+                self.model = cpmodels.CellposeModel(gpu=True, model_type="cyto3")
             if not self.positions and imagedata.has_positions():
                 self.positions = images.FOVPositions(positions=imagedata.load_fov_positions())
         self.masks = {}

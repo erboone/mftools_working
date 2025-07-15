@@ -3,6 +3,7 @@ from pathlib import Path
 from glob import glob
 import warnings
 import json
+import os
 
 import pandas as pd
 import scanpy as sc
@@ -42,7 +43,7 @@ class _AbsMFExperiment(ABC):
             root:str,
             name:str,
             reg:str=None,
-            alt_paths:dict={},
+            alt_paths:dict={}, # This is in danger
             seg_kwargs:dict={},
             img_kwargs:dict={}
         ):
