@@ -580,10 +580,18 @@ def celltype_corr(mer_adata, ref_adata, ctkey, lineage_order=None):
     #norm = matplotlib.colors.Normalize(vmin=min(medians), vmax=sorted(medians)[-2])
     fig = sns.clustermap(result, 
                 cmap="coolwarm", row_cluster=False, col_cluster=False, 
-                dendrogram_ratio=(0, 0.1), cbar_pos=(1, 0.15, .03, .7),
+                dendrogram_ratio=(0, 0.1), cbar_pos=(1.05, 0.15, .03, .7),
                 vmin=-1, vmax=1,
                 annot=False, fmt=".2f", cbar_kws={"label": "Correlation of transcripts per gene"}, 
-                figsize=(15, 15), annot_kws={"size": 14, "weight": "bold"})# col_colors=[cmap(norm(med)) for med in medians], 
+                figsize=(10, 10), annot_kws={"size": 14, "weight": "bold"})# col_colors=[cmap(norm(med)) for med in medians], 
+
+    plt.setp(fig.ax_heatmap.get_xticklabels(),rotation=30, ha="right", rotation_mode="anchor", weight="bold")
+    plt.setp(fig.ax_heatmap.get_yticklabels(), weight="bold")
+    fig.ax_heatmap.set_title("Paired-tag", fontsize=20)
+    fig.ax_heatmap.set_ylabel("MERFISH", fontsize=20)
+    fig.ax_heatmap.yaxis.set_label_position("left")
+    fig.ax_heatmap.yaxis.label.set_rotation(90)
+    
     return fig
     
 def _plot_correlation(data1:pd.Series, data2:pd.Series, ax1:str, ax2:str, highlight, logscale:bool=False):
