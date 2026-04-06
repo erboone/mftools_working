@@ -482,36 +482,58 @@ def fov_transcripts():
     pass
     # do this
 
-#added the perameter of highlighttype which is what you want highlighted. When I wrote the function I used fov but if you want to do celltype you can put that as the string in highlighttype
-def embedding_highlight(adata: sc.AnnData, highlight: str | list[int], highlighttype: str, basis: str, colors: list[str], background: str, returntype: str, **kwargs) -> None:
-    s = 120000 / adata.shape[0]
-    basis_coords = adata.obsm[basis]
-    basis_coords_array = np.array(basis_coords)
-    fig, ax = plt.subplots()
-    ax.set_facecolor(background)
-    ax.scatter(basis_coords_array[:, 0], basis_coords_array[:, 1], s=s, c='lightgray', **kwargs)
+def embedding_highlight(
+        adata:sc.AnnData,
+        highlight:str | list[str],
+        basis:str,
+        color:str,
+        save:str=None,
+        scale = 1400,
+        face='black',
+        dpi:int=600,
+        kwargs={},
+        na_color=(.96, .96, .96),
+        specialcolor: list = ["blue"]
+        ) -> None:
 
-    if len(highlight) != len(colors) and len(colors) != 1:
-        raise ValueError("Amount of colors must match amount of things to highlight")
+    sc.set_figure_params(dpi_save=dpi, frameon=False)
+    if face == 'black':
+        plt.rc('text', color='w')
+    elif face == 'white':
+        plt.rc('text', color='black')
+
+    # Mimics default size calculation of sc.pl.embedding()
+    s = scale * (120000 / adata.shape[0])
+
+    ax = sc.pl.embedding(
+        adata=adata,
+        basis=basis,
+        show=False,
+        na_color=na_color,
+        size=s,
+        **kwargs
     
-    if len(colors) == 1:
-        updated_colors = []
-        for i in range(len(highlight)):
-            updated_colors.append(colors[0])
-        colors = updated_colors
-        
-    if len(highlight) == len(colors):
-        for i, tohighlight in enumerate(highlight):
-            highlight_mask = adata.obs[highlighttype] == tohighlight
-            ax.scatter(basis_coords[highlight_mask.to_numpy(), 0], basis_coords[highlight_mask.to_numpy(), 1], s=s, c=colors[i], label=f'{highlighttype}:{tohighlight}', **kwargs)
-        plt.legend()
-
-    if returntype == "save":
-        plt.savefig("embedding_highlight.png")
-    if returntype == "show":
-        plt.show()
-    if returntype == "return":
-        return plt
+    )
+    ax.set_facecolor(face)
+    ax.get_figure().set_facecolor(face)
+    
+    if isinstance(highlight,str)==True or len(highlight) != len(specialcolor):
+        specialcolor = specialcolor[0]
+        colorusing = {h: specialcolor for h in highlight} 
+    else:
+        colorusing = dict(zip(highlight, specialcolor))
+    sc.pl.embedding(
+        adata=adata[adata.obs[color].isin(highlight)],
+        basis=basis,
+        color=color,
+        ax=ax,
+        size=s,
+        palette= colorusing,
+        **kwargs
+    )
+    fig = ax.get_figure()
+    fig.savefig(save, dpi=1000, bbox_inches='tight')
+    plt.close(fig)
     
 
 def celltype_corr(mer_adata, ref_adata, ctkey, lineage_order=None):
